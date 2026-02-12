@@ -58,6 +58,43 @@ You run the platform once to get data, then work through the dbt tasks. Every st
 | **Tests**      | Column tests (not null, unique, relationships) + at least one singular test (e.g. sessions don’t overlap). |
 | **CI**         | GitHub Action: `dbt compile` and optionally `dbt build` so broken contracts fail the pipeline. |
 
+
+---
+
+## Snowflake setup & connection
+
+<details>
+<summary>Snowflake boilerplate (env + dbt profile)</summary>
+
+```env
+# game-data-platform/app/.env
+SNOWFLAKE_USER=your_username
+SNOWFLAKE_PASSWORD=your_password
+SNOWFLAKE_ACCOUNT=your_account
+SNOWFLAKE_WAREHOUSE=COMPUTE_WH
+SNOWFLAKE_DATABASE=GAME_ANALYTICS
+SNOWFLAKE_SCHEMA=RAW
+```
+
+```yaml
+# ~/.dbt/profiles.yml
+game_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: your_account
+      user: your_username
+      password: your_password
+      role: your_role
+      warehouse: COMPUTE_WH
+      database: GAME_ANALYTICS
+      schema: DEV
+      threads: 4
+```
+
+</details>
+
 ---
 
 ## Tasks (Do It Yourself)
@@ -78,6 +115,11 @@ Do the tasks in order. Each task is a single, clear step from start to finish.
 *(No code — follow the steps above. You can add notes or links here later.)*
 
 </details>
+
+#### Why this phase matters
+
+- You set up the runtime pieces (virtualenv, Snowflake credentials, dbt profile) so every other step can run consistently.
+- Having a dedicated `app/` and clear configs makes it easy for others to clone the repo and reproduce your warehouse.
 
 ---
 
@@ -101,6 +143,11 @@ sources:
 ```
 
 </details>
+
+#### Why this phase matters
+
+- Defining sources with columns and tests turns your raw Snowflake tables into a documented contract for the rest of the project.
+- Catching issues (bad values, missing keys) at the source layer keeps downstream models simpler and failures easier to debug.
 
 ---
 
@@ -136,6 +183,11 @@ select * from source  -- add event_at, lower(event_name), lower(platform)
 ```
 
 </details>
+
+#### Why this phase matters
+
+- Staging models clean and standardize the raw data so all downstream tables share the same names, types, and semantics.
+- This is where you remove one-off quirks from ingestion and give analytics engineers a stable, well-typed surface to build on.
 
 ---
 
@@ -228,6 +280,11 @@ models:
 
 </details>
 
+#### Why this phase matters
+
+- Core marts (dimensions and facts) are the main interface between raw data and analytics: almost every metric is built on them.
+- Getting join keys, grain, and aggregations right here prevents subtle bugs in every dashboard and analysis that follows.
+
 ### Phase 4: Analytics marts
 
 **daily_active_players**
@@ -288,6 +345,11 @@ with players as ( select player_id, country_code, difficulty_selected, date(firs
 
 </details>
 
+#### Why this phase matters
+
+- Analytics marts (DAU, funnel, retention) translate raw behavioral data into the KPIs your team actually discusses.
+- By keeping these as dbt models, you can iterate on definitions (e.g. what counts as active) with version control and tests instead of ad hoc SQL.
+
 ### Phase 5: Macros and project config
 
 - [ ] **5.1** Add macro **generate_schema_name(custom_schema_name, node)** so that when `custom_schema_name` is set it is used, otherwise use `target.schema`. (This lets staging and marts build into different schemas when you set `+schema` in dbt_project.)
@@ -316,6 +378,11 @@ models:
 
 </details>
 
+#### Why this phase matters
+
+- Centralizing environment settings (schemas, materializations) keeps dev, CI, and prod aligned without copying SQL.
+- Small macros like `generate_schema_name` make it easy to add more environments later without rewriting models.
+
 ### Phase 6: Tests and quality
 
 - [ ] **6.1** In schema YAMLs, ensure primary key columns have `unique` and `not_null`; foreign keys have `relationships` to the referenced model. Add `not_null` (or accepted_values) on other critical columns.
@@ -337,6 +404,11 @@ tests:
 ```
 
 </details>
+
+#### Why this phase matters
+
+- Tests turn your warehouse into something you can trust: they catch broken assumptions as soon as data or code changes.
+- Encoding business rules (like no overlapping sessions) in tests prevents silent data drift that would invalidate product decisions.
 
 ### Phase 7: CI
 
@@ -364,6 +436,56 @@ jobs:
 ```
 
 </details>
+
+#### Why this phase matters
+
+- CI ensures every change to models or tests is exercised automatically before it reaches main.
+- When CI fails on bad data or broken contracts, you find issues in pull requests instead of in production dashboards.
+
+
+---
+
+### Phase 8 (Advanced): Incremental `fct_game_events`
+
+- [ ] **8.1** Update `fct_game_events` to use `materialized='incremental'` with a stable `unique_key` (e.g. `event_id`) and a sensible `on_schema_change` strategy.
+- [ ] **8.2** Implement an incremental filter with `is_incremental()` so that incremental runs only process **new** events (e.g. `event_at > max(event_at) in {{ this }}`).
+- [ ] **8.3** Run a full-refresh and an incremental run, compare row counts and tests, and make sure incremental behavior matches the full build.
+
+<details>
+<summary>Answer — Phase 8 (incremental fct_game_events)</summary>
+
+```sql
+{{ config(
+  materialized = 'incremental',
+  unique_key   = 'event_id',
+  on_schema_change = 'ignore',  -- or 'append_new_columns' / 'sync_all_columns'
+) }}
+
+with events as (
+  select * from {{ ref('stg_game_events') }}
+  -- joins and enrichments here
+)
+
+{% if is_incremental() %}
+  -- Only process events later than what we already have
+  , filtered as (
+      select *
+      from events
+      where event_at > (select coalesce(max(event_at), '1900-01-01') from {{ this }})
+    )
+  select * from filtered
+{% else %}
+  select * from events
+{% endif %}
+```
+
+</details>
+
+#### Why this phase matters
+
+- Real production warehouses rarely rebuild large event tables from scratch — **incremental models** keep compute + cost under control.
+- Designing a correct incremental filter (grain, unique key, late-arriving data) forces you to think carefully about **time, idempotency, and data correctness**.
+
 
 ---
 
@@ -394,6 +516,17 @@ If you can answer these — your warehouse is working.
 
 Goal: understand whether players come back — and who does not.
 
+<details>
+<summary>Answers — 1. Retention & Player Return</summary>
+
+- **Q1 – D1/D3/D7 retention**: use the `retention` model; filter `days_since_cohort IN (1, 3, 7)` and read `retention_rate_pct` for those days (optionally averaging across cohorts).
+- **Q2 – Countries with lowest retention**: from `retention`, group by `country_code` and a chosen `days_since_cohort` (e.g. 1 or 7), order by `retention_rate_pct` ascending.
+- **Q3 – Retention by difficulty**: same `retention` model, grouped by `difficulty_selected` and `days_since_cohort`.
+- **Q4 – % of players with only one session**: from `dim_players`, compute `count(*) WHERE total_sessions = 1` divided by `count(*)` overall.
+- **Q5 – % of players returning for a second session**: from `dim_players`, compute `count(*) WHERE total_sessions >= 2` divided by `count(*)` overall.
+
+</details>
+
 ### 💀 2. Drop-Off & Friction
 
 6. At which step of the session funnel do players drop the most?
@@ -402,6 +535,16 @@ Goal: understand whether players come back — and who does not.
 9. Are there sessions with **high deaths but low progression**?
 
 Goal: identify friction points in the core loop.
+
+<details>
+<summary>Answers — 2. Drop-Off & Friction</summary>
+
+- **Q6 – Funnel step with biggest drop**: use `funnel_sessions`; compare `sessions_with_*` columns vs `total_sessions` for each step to see where conversion rate is lowest.
+- **Q7 – % of sessions without a checkpoint**: in `funnel_sessions`, compute `1 - sessions_with_checkpoint_reached / total_sessions` for your chosen date range.
+- **Q8 – Sessions that start a chapter but never complete one**: from `funnel_sessions`, compare `sessions_with_chapter_started` vs `sessions_with_chapter_completed` and compute the difference / `total_sessions`.
+- **Q9 – High deaths, low progression sessions**: query `fct_sessions` filtering for `deaths_count` above a threshold and `chapters_completed = 0` (or very low), optionally grouping by chapter or difficulty to locate problem areas.
+
+</details>
 
 ### ⚔️ 3. Difficulty & Balance
 
@@ -412,6 +555,16 @@ Goal: identify friction points in the core loop.
 
 Goal: detect balance issues before ship.
 
+<details>
+<summary>Answers — 3. Difficulty & Balance</summary>
+
+- **Q10 – Difficulty with highest death rate per session**: from `fct_sessions`, group by `difficulty_selected` and compute `sum(deaths_count) / count(*)` (or average `deaths_count`).
+- **Q11 – Do higher difficulties churn faster?**: from `retention`, group by `difficulty_selected` and `days_since_cohort` (e.g. day 1 / 7) and compare `retention_rate_pct` across difficulties.
+- **Q12 – Chapters with lowest completion**: use `fct_game_events` (or staging events) to compare counts of `chapter_started` vs `chapter_completed` by `chapter_id` / `chapter_name` and compute completion rate.
+- **Q13 – Session duration vs chapter completion**: from `fct_sessions`, bucket `session_duration_minutes` (short/medium/long) and compute `chapters_completed` or completion rate per bucket to see the relationship.
+
+</details>
+
 ### ⏱ 4. Session Behavior
 
 14. What is the **median session duration**?
@@ -420,6 +573,16 @@ Goal: detect balance issues before ship.
 17. Are there sessions with zero or unusually low event activity?
 
 Goal: understand how players actually play.
+
+<details>
+<summary>Answers — 4. Session Behavior</summary>
+
+- **Q14 – Median session duration**: read `median(session_duration_minutes)` (or approximate with `percentile_cont(0.5)`) from `fct_sessions`.
+- **Q15 – Longer sessions vs retention**: aggregate `fct_sessions` to player level (e.g. average `session_duration_minutes` per player), join to `retention` or cohort info, and compare retention metrics across duration buckets.
+- **Q16 – Average events_per_minute**: from `fct_sessions`, take `avg(events_per_minute)` (optionally by difficulty, platform, or country).
+- **Q17 – Low-activity sessions**: filter `fct_sessions` where `events_per_minute` is near zero or `total_events = 0` to find idle/buggy sessions.
+
+</details>
 
 ### 🌍 5. Segmentation
 
@@ -436,6 +599,14 @@ Goal: understand how players actually play.
 
 Goal: separate your engaged audience from early churn.
 
+<details>
+<summary>Answers — 5. Segmentation</summary>
+
+- **Q18 – Core players**: in `dim_players`, define a core player as `total_sessions >= 5`, `total_playtime_minutes >= 120`, and `chapters_completed >= 1` (if you add that metric); count them and slice by `country_code` and `difficulty_selected`.
+- **Q19 – One-and-done players**: from `dim_players`, filter `total_sessions = 1` and (optionally) zero progression; compute their share of all players and break down by country and difficulty to see where early churn concentrates.
+
+</details>
+
 ### 📉 6. Data Quality & Edge Cases
 
 20. Are there **events outside session windows**?
@@ -445,6 +616,16 @@ Goal: separate your engaged audience from early churn.
 
 Goal: validate the integrity of your warehouse.
 
+<details>
+<summary>Answers — 6. Data Quality & Edge Cases</summary>
+
+- **Q20 – Events outside session windows**: in `fct_game_events`, filter where `session_id IS NULL` to find events that didn’t match any session window.
+- **Q21 – Overlapping sessions**: inspect the output of the `sessions_no_overlap` singular test (or re-run its SQL) to list players with overlapping `session_start`/`session_end` ranges.
+- **Q22 – Sessions with negative or zero duration**: in `fct_sessions` (or `stg_sessions`), filter `session_duration_minutes <= 0` and investigate their raw timestamps.
+- **Q23 – Broken foreign keys**: rely on dbt `relationships` tests (e.g. `fct_sessions.player_id` → `dim_players.player_id`); for manual checks, left join facts to dims and look for rows where the dim side is null.
+
+</details>
+
 ### 🚀 7. Strategic Thinking
 
 24. If D1 retention improved by 5%, how would that affect DAU over 30 days?
@@ -452,6 +633,15 @@ Goal: validate the integrity of your warehouse.
 26. If you could monitor only **one metric before launch**, what would it be — and why?
 
 Goal: move from reporting to decision-making.
+
+<details>
+<summary>Answers — 7. Strategic Thinking</summary>
+
+- **Q24 – D1 +5% impact on DAU**: use `daily_active_players` or aggregated `fct_sessions` to simulate higher day‑1 retention in cohorts and project its effect on daily active counts over 30 days (e.g. by adjusting retention curves).
+- **Q25 – Chapter completion +10%**: from your chapter completion analysis (Q12), reason about which downstream metrics would move (e.g. more sessions reaching later chapters, higher total playtime, higher retention for affected cohorts).
+- **Q26 – Single pre‑launch metric**: your answer should be justified using the models above (e.g. D1 retention from `retention`, or chapters completed from `fct_game_events`), and argue why that metric best reflects long‑term success for this game.
+
+</details>
 
 ### 🏆 Completion Criteria
 
