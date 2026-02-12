@@ -12,7 +12,7 @@ There are two common paths:
 
 If you are doing this as part of a **course, bootcamp, or workshop**, your instructor may give you:
 
-- A Snowflake **URL** (e.g. `https://xy12345.eu-central-1.snowflakecomputing.com`)
+- A Snowflake **URL** (e.g. `https://cwrlboz-pz37526.snowflakecomputing.com`)
 - A **username** and temporary **password**
 - The **role**, **warehouse**, and **database/schema** you should use
 
@@ -20,7 +20,7 @@ In that case:
 
 1. Follow the instructor’s onboarding docs to log in the first time and change your password.
 2. Keep the following values handy (you’ll need them for `.env` and your dbt profile):
-   - Account identifier (e.g. `xy12345.eu-central-1`)
+   - Account identifier (e.g. `cwrlboz-pz37526`)
    - Username and password
    - Warehouse name (e.g. `COMPUTE_WH`, `TRANSFORMING`)
    - Database and schema names where you are allowed to create tables

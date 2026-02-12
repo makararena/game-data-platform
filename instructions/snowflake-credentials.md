@@ -17,9 +17,9 @@ You need the following values:
 - **SNOWFLAKE_USER**: your Snowflake login (e.g. `joel.miller`).
 - **SNOWFLAKE_PASSWORD**: your Snowflake password.
 - **SNOWFLAKE_ACCOUNT**: your Snowflake account identifier  
-  - Often looks like `xy12345.eu-central-1` or similar.
+  - For this course it will look like `cwrlboz-pz37526`.
   - You can usually see it in the Snowflake URL:  
-    `https://xy12345.eu-central-1.snowflakecomputing.com`
+    `https://cwrlboz-pz37526.snowflakecomputing.com`
 - **SNOWFLAKE_WAREHOUSE**: the virtual warehouse to use for compute (e.g. `COMPUTE_WH` or `TRANSFORMING`).
 - **SNOWFLAKE_DATABASE**: the database where this course will create raw tables (e.g. `GAME_ANALYTICS`).
 - **SNOWFLAKE_SCHEMA**: the schema for raw tables (e.g. `RAW`).

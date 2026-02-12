@@ -19,7 +19,7 @@ Usage:
     # Set environment variables in .env file or export them:
     SNOWFLAKE_USER="your_username"
     SNOWFLAKE_PASSWORD="your_password"
-    SNOWFLAKE_ACCOUNT="cwrlboz"
+    SNOWFLAKE_ACCOUNT="cwrlboz-pz37526"
     SNOWFLAKE_WAREHOUSE="COMPUTE_WH"
     
     # Run the script
@@ -34,6 +34,7 @@ Note: The [pandas] extra is REQUIRED for write_pandas() to work properly.
 """
 
 import os
+import sys
 import json
 from pathlib import Path
 from dotenv import load_dotenv
@@ -316,4 +317,29 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except snowflake.connector.errors.HttpError as e:
+        # Handle common HTTP connectivity errors (e.g. bad account identifier)
+        print("\n❌ Failed to connect to Snowflake (HTTP error).")
+        print("   This usually means your SNOWFLAKE_ACCOUNT is incorrect or unreachable.")
+        current_account = SNOWFLAKE_ACCOUNT or "<not set>"
+        print(f"   SNOWFLAKE_ACCOUNT is currently set to: {current_account}")
+        print("   It should look like 'cwrlboz-pz37526' (the course account id).")
+        print("   See credentials guide:")
+        print("     https://github.com/makararena/game-data-platform/blob/main/instructions/snowflake-credentials.md")
+        # Optionally also show the low‑level message for debugging
+        print(f"\n   Raw error from driver: {e}")
+        sys.exit(1)
+    except ValueError as e:
+        # Missing required env vars / misconfiguration
+        print(f"\n❌ Configuration error: {e}")
+        print("   Make sure these variables are set in app/.env (or your environment):")
+        print("     SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, SNOWFLAKE_ACCOUNT,")
+        print("     SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_SCHEMA")
+        sys.exit(1)
+    except Exception as e:
+        # Catch‑all to avoid an unhandled stack trace for students
+        print(f"\n❌ Unexpected error during Snowflake load: {e}")
+        print("   If this keeps happening, please share this message with the instructor.")
+        sys.exit(1)

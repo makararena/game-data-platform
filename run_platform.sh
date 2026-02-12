@@ -81,11 +81,13 @@ echo "  4) Install Python dependencies"
 echo "  5) Generate synthetic game data"
 echo "  6) Load data into Snowflake (RAW_* tables)"
 echo
-
 echo -e "${BOLD}Need help before you continue?${RESET}"
-echo "  - instructions/snowflake-account-setup.md   (how to create a Snowflake account)"
-echo "  - instructions/snowflake-credentials.md     (which credentials you need & where to put them)"
-echo "  - instructions/pre-launch-setup.md          (which database/schema to create before running)"
+echo "  - Snowflake account setup:"
+echo "      https://github.com/makararena/game-data-platform/blob/main/instructions/snowflake-account-setup.md"
+echo "  - Snowflake credentials (.env):"
+echo "      https://github.com/makararena/game-data-platform/blob/main/instructions/snowflake-credentials.md"
+echo "  - Pre-launch Snowflake setup (DB & schemas):"
+echo "      https://github.com/makararena/game-data-platform/blob/main/instructions/pre-launch-setup.md"
 echo
 
 read -r -p "Continue? [Y/n]: " CONTINUE || true
@@ -112,7 +114,7 @@ if [ -f "${ENV_FILE}" ]; then
   source "${ENV_FILE}"
 fi
 
-prompt_with_default "Snowflake account (e.g. xy12345.eu-central-1)" "${SNOWFLAKE_ACCOUNT:-}" SNOWFLAKE_ACCOUNT
+prompt_with_default "Snowflake account (e.g. cwrlboz-pz37526)" "${SNOWFLAKE_ACCOUNT:-}" SNOWFLAKE_ACCOUNT
 prompt_with_default "Snowflake user" "${SNOWFLAKE_USER:-}" SNOWFLAKE_USER
 
 # password: hidden input
