@@ -49,6 +49,27 @@ There are **three entities**; all relationships are **one-to-many** (no many-to-
 
 In short: **Player 1 → N Sessions → N Events**. Events are tied to a session via `session_id` (and to a player via `player_id`); sessions are tied to a player via `player_id`.
 
+### Unique values (reference data)
+
+The synthetic pipeline uses fixed sets of values. Useful for dbt `accepted_values` tests and for understanding the data:
+
+| Field          | Table(s)        | Unique values |
+|----------------|-----------------|---------------|
+| **country**    | `RAW_PLAYERS`   | `US`, `PL`, `DE`, `FR`, `ES`, `BY` |
+| **language**   | `RAW_PLAYERS`   | `en`, `pl`, `de`, `fr`, `es`, `be` |
+| **difficulty_selected** | `RAW_PLAYERS` | `easy`, `normal`, `hard`, `grounded` |
+| **platform**   | `RAW_SESSIONS`, `RAW_GAME_EVENTS` | `ps5`, `pc` |
+| **event_name** | `RAW_GAME_EVENTS` | `game_started`, `chapter_started`, `checkpoint_reached`, `enemy_killed`, `player_died`, `item_crafted`, `chapter_completed`, `game_closed` |
+
+**properties** (in `RAW_GAME_EVENTS`) is a JSON/VARIANT; not every event has every key. Possible keys and example values:
+
+- **chapter_name**: e.g. `The Outskirts`, `The Quarantine Zone`, `Downtown`, `The Suburbs`, `The University`, `The Hospital`, `The Financial District`, `The Docks`, `The Bridge`, `The Firefly Lab`
+- **location**: e.g. `abandoned_building`, `street`, `sewer`, `rooftop`, `warehouse`, `park`, `subway`, `apartment`, `mall`, `school`
+- **weather**: `clear`, `rain`, `fog`, `snow`
+- **enemy_name**: e.g. `runner`, `clicker`, `bloater`, `stalker`, `shambler`, `hunter`, `soldier`, `scavenger`, `bandit`, `merchant`
+- **weapon_name**: e.g. `9mm_pistol`, `revolver`, `hunting_rifle`, `assault_rifle`, `hunting_bow`, `compound_bow`
+- **crafting_materials**: e.g. `alcohol`, `rag`, `scissors`, `bottle`, `tape`, `blade` (used for medkit, molotov, shiv)
+
 ---
 
 ## Quick start
@@ -88,6 +109,9 @@ After `run_platform.sh` finishes, your Snowflake database will have the
    - **Generates** synthetic players, sessions, and game events (CSVs).
    - **Loads** them into Snowflake as `RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS`.
 
+   Before you run it, do the setup in this order:  
+   [1) Snowflake account setup](instructions/snowflake-account-setup.md) → [2) Pre-launch setup](instructions/pre-launch-setup.md) (database & schemas) → [3) Snowflake credentials](instructions/snowflake-credentials.md).
+
 2. **Your dbt project** (you create it)  
    You create a dbt project and build:
    - **Raw** — source definitions pointing at those tables.
@@ -96,7 +120,9 @@ After `run_platform.sh` finishes, your Snowflake database will have the
    - **Macros** — e.g. schema naming for dev/ci/prod.
    - **Tests** — not null, unique, relationships, and a custom business rule (e.g. no overlapping sessions).
 
-You run the platform once to get data, then set up dbt and work through the tasks. See [dbt setup](instructions/dbt-setup.md) for how to get started with dbt.
+   See [dbt setup](instructions/dbt-setup.md) for how to get started with dbt.
+
+You run the platform once to get data, then set up dbt and work through the tasks.
 
 ---
 
@@ -109,47 +135,10 @@ You run the platform once to get data, then set up dbt and work through the task
 | **Staging**    | dbt **models**: `stg_players`, `stg_sessions`, `stg_game_events` — clean, standardize names and types. |
 | **Core marts** | `dim_players`, `fct_sessions`, `fct_game_events` — dimensions and facts for analysis. |
 | **Analytics marts** | `daily_active_players`, `funnel_sessions`, `retention` — reporting-ready aggregates. |
-| **Macros**     | e.g. `generate_schema_name` for environment-specific schemas. |
+| **Macros**     | `generate_schema_name` for environment-specific schemas. |
 | **Tests**      | Column tests (not null, unique, relationships) + at least one singular test (e.g. sessions don’t overlap). |
 | **CI**         | GitHub Action: `dbt compile` and optionally `dbt build` so broken contracts fail the pipeline. |
 
-
----
-
-## Snowflake setup & connection
-
-<details>
-<summary>Snowflake boilerplate (env + dbt profile)</summary>
-
-```env
-# game-data-platform/app/.env
-SNOWFLAKE_USER=your_username
-SNOWFLAKE_PASSWORD=your_password
-SNOWFLAKE_ACCOUNT=your_account
-SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-SNOWFLAKE_DATABASE=GAME_ANALYTICS
-SNOWFLAKE_SCHEMA=RAW
-```
-
-```yaml
-# ~/.dbt/profiles.yml
-game_analytics:
-  target: dev
-  outputs:
-    dev:
-      type: snowflake
-      account: your_account
-      user: your_username
-      password: your_password
-      role: your_role
-      warehouse: COMPUTE_WH
-      database: GAME_ANALYTICS
-      schema: DEV
-      threads: 4
-```
-
- </details>
- 
  ---
  
  ## Tasks (Do It Yourself)
