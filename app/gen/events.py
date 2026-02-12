@@ -1,7 +1,6 @@
 import json
 import os
 import random
-import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict
@@ -20,6 +19,8 @@ OUTPUT_CSV = OUTPUT_DIR / "raw_game_events.csv"
 
 # Read from environment variable or use default
 GAME_VERSION = os.getenv("GAME_VERSION", "1.0.3")
+EVENT_DATE_START = os.getenv("EVENT_DATE_START")  # YYYY-MM-DD, optional
+EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
 
 EVENT_TYPES = [
     "game_started",
@@ -80,6 +81,10 @@ def random_time(start: datetime, end: datetime) -> datetime:
     return start + timedelta(seconds=random.randint(0, int(delta.total_seconds())))
 
 
+# Deterministic event ID counter (reset each run so same seed => same IDs)
+_event_id_counter = [0]
+
+
 def make_event(
     event_time: datetime,
     player_id: str,
@@ -87,9 +92,11 @@ def make_event(
     event_name: str,
     properties: Dict,
 ) -> Dict:
-    """Make an event json object"""
+    """Make an event json object (event_id is deterministic for reproducible runs)."""
+    eid = f"event_{_event_id_counter[0]}"
+    _event_id_counter[0] += 1
     return {
-        "event_id": str(uuid.uuid4()),
+        "event_id": eid,
         "event_time": event_time,
         "player_id": player_id,
         "event_name": event_name,
@@ -326,6 +333,10 @@ def generate_events_for_session(session, difficulty) -> List[Dict]:
 # MAIN
 # =====================
 def main():
+    seed = int(os.getenv("GAME_DATA_SEED", "42"))
+    random.seed(seed)
+    _event_id_counter[0] = 0
+
     # Read input CSV files
     players = pd.read_csv(PLAYERS_CSV)
     sessions = pd.read_csv(SESSIONS_CSV)
@@ -350,6 +361,14 @@ def main():
 
     df = pd.DataFrame(all_events)
     df["event_time"] = pd.to_datetime(df["event_time"])
+
+    if EVENT_DATE_START and EVENT_DATE_END:
+        range_start = datetime.strptime(EVENT_DATE_START, "%Y-%m-%d")
+        range_end = datetime.strptime(EVENT_DATE_END, "%Y-%m-%d") + timedelta(days=1)
+        before = len(df)
+        df = df[(df["event_time"] >= range_start) & (df["event_time"] < range_end)]
+        if len(df) < before:
+            print(f"Filtered to event date range: {before - len(df)} events outside [{EVENT_DATE_START}, {EVENT_DATE_END}] dropped")
 
     # Serialize properties dict to JSON string for CSV
     df["properties"] = df["properties"].apply(json.dumps)

@@ -14,6 +14,8 @@ OUTPUT_CSV = OUTPUT_DIR / "raw_players.csv"
 
 # Read from environment variable or use default
 N_PLAYERS = int(os.getenv("N_PLAYERS", "1500"))
+EVENT_DATE_START = os.getenv("EVENT_DATE_START")  # YYYY-MM-DD, optional
+EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
 
 # Countries and languages
 COUNTRIES = [
@@ -55,6 +57,17 @@ def random_past_timestamp(days_back: int = 90) -> datetime:
     )
 
 
+def random_timestamp_in_event_range() -> datetime:
+    """Random timestamp within [EVENT_DATE_START, end of EVENT_DATE_END]; if not set, use last 90 days."""
+    if EVENT_DATE_START and EVENT_DATE_END:
+        start = datetime.strptime(EVENT_DATE_START, "%Y-%m-%d")
+        end = datetime.strptime(EVENT_DATE_END, "%Y-%m-%d") + timedelta(days=1)
+        delta = end - start
+        sec = random.randint(0, max(0, int(delta.total_seconds()) - 1))
+        return start + timedelta(seconds=sec)
+    return random_past_timestamp(90)
+
+
 # =====================
 # PLAYER GENERATION
 # =====================
@@ -67,7 +80,7 @@ def generate_players(n_players: int) -> pd.DataFrame:
 
         player = {
             "player_id": f"player_{i}",
-            "first_seen_at": random_past_timestamp(),
+            "first_seen_at": random_timestamp_in_event_range(),
             "country": country,
             "language": language,
             "difficulty_selected": weighted_choice(
@@ -84,6 +97,9 @@ def generate_players(n_players: int) -> pd.DataFrame:
 # MAIN
 # =====================
 def main():
+    seed = int(os.getenv("GAME_DATA_SEED", "42"))
+    random.seed(seed)
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     df = generate_players(N_PLAYERS)

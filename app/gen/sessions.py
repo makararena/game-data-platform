@@ -17,6 +17,8 @@ OUTPUT_CSV = OUTPUT_DIR / "raw_sessions.csv"
 
 # Read from environment variable or use default
 MAX_SESSIONS_PER_PLAYER = int(os.getenv("MAX_SESSIONS_PER_PLAYER", "25"))
+EVENT_DATE_START = os.getenv("EVENT_DATE_START")  # YYYY-MM-DD, optional
+EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
 
 PLATFORMS = [
     ("ps5", 0.7),
@@ -60,19 +62,30 @@ def random_session_length() -> int:
 # =====================
 # SESSION GENERATION
 # =====================
+def _parse_event_range():
+    """Return (range_start, range_end) as datetime or (None, None) if not set."""
+    if not EVENT_DATE_START or not EVENT_DATE_END:
+        return None, None
+    start = datetime.strptime(EVENT_DATE_START, "%Y-%m-%d")
+    end = datetime.strptime(EVENT_DATE_END, "%Y-%m-%d") + timedelta(days=1)  # end of day
+    return start, end
+
+
 def generate_sessions(players_df: pd.DataFrame) -> pd.DataFrame:
+    range_start, range_end = _parse_event_range()
     sessions = []
     session_counter = 1
 
     for _, player in players_df.iterrows():
-        # Heavy tail: most players few sessions, some many
         n_sessions = max(
             1,
-            int(random.expovariate(1 / 5)) # Exponential distribution with mean 5
+            int(random.expovariate(1 / 5))
         )
-        n_sessions = min(n_sessions, MAX_SESSIONS_PER_PLAYER) # Cap the number of sessions per player
+        n_sessions = min(n_sessions, MAX_SESSIONS_PER_PLAYER)
 
         last_session_end = pd.to_datetime(player["first_seen_at"])
+        if range_start is not None:
+            last_session_end = max(last_session_end, range_start)
 
         for _ in range(n_sessions):
             gap_days = random.randint(0, 5)
@@ -82,15 +95,17 @@ def generate_sessions(players_df: pd.DataFrame) -> pd.DataFrame:
                 days=gap_days,
                 hours=gap_hours,
             )
-
             session_length = random_session_length()
+            session_end = session_start + timedelta(minutes=session_length)
 
-            session_end = session_start + timedelta(
-                minutes=session_length
-            )
+            if range_start is not None:
+                session_start = max(session_start, range_start)
+            if range_end is not None:
+                session_end = min(session_end, range_end)
+            if session_start >= session_end:
+                continue
 
             platform = weighted_choice(PLATFORMS)
-
             sessions.append(
                 {
                     "session_id": f"session_{session_counter}",
@@ -100,7 +115,6 @@ def generate_sessions(players_df: pd.DataFrame) -> pd.DataFrame:
                     "platform": platform,
                 }
             )
-
             last_session_end = session_end
             session_counter += 1
 
@@ -111,6 +125,9 @@ def generate_sessions(players_df: pd.DataFrame) -> pd.DataFrame:
 # MAIN
 # =====================
 def main():
+    seed = int(os.getenv("GAME_DATA_SEED", "42"))
+    random.seed(seed)
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     players_df = pd.read_csv(

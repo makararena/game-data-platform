@@ -1,5 +1,24 @@
+# Environment and secrets
 .env
+.env.*
+
+# Generated data (CSV output from pipeline)
 data/
+
+# Python
 .venv/
-dbt/
-logs/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
