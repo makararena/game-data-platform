@@ -21,6 +21,7 @@ OUTPUT_CSV = OUTPUT_DIR / "raw_game_events.csv"
 GAME_VERSION = os.getenv("GAME_VERSION", "1.0.3")
 EVENT_DATE_START = os.getenv("EVENT_DATE_START")  # YYYY-MM-DD, optional
 EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
+LOAD_BATCH_ID = int(os.getenv("LOAD_BATCH_ID", "1"))  # For incremental: batch 2+ = new events, unique IDs
 
 EVENT_TYPES = [
     "game_started",
@@ -93,7 +94,7 @@ def make_event(
     properties: Dict,
 ) -> Dict:
     """Make an event json object (event_id is deterministic for reproducible runs)."""
-    eid = f"event_{_event_id_counter[0]}"
+    eid = f"event_{_event_id_counter[0]}" if LOAD_BATCH_ID == 1 else f"event_{LOAD_BATCH_ID}_{_event_id_counter[0]}"
     _event_id_counter[0] += 1
     return {
         "event_id": eid,

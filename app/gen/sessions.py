@@ -19,6 +19,7 @@ OUTPUT_CSV = OUTPUT_DIR / "raw_sessions.csv"
 MAX_SESSIONS_PER_PLAYER = int(os.getenv("MAX_SESSIONS_PER_PLAYER", "25"))
 EVENT_DATE_START = os.getenv("EVENT_DATE_START")  # YYYY-MM-DD, optional
 EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
+LOAD_BATCH_ID = int(os.getenv("LOAD_BATCH_ID", "1"))  # For incremental: batch 2+ = new sessions, unique IDs
 
 PLATFORMS = [
     ("ps5", 0.7),
@@ -106,9 +107,10 @@ def generate_sessions(players_df: pd.DataFrame) -> pd.DataFrame:
                 continue
 
             platform = weighted_choice(PLATFORMS)
+            session_id = f"session_{session_counter}" if LOAD_BATCH_ID == 1 else f"session_{LOAD_BATCH_ID}_{session_counter}"
             sessions.append(
                 {
-                    "session_id": f"session_{session_counter}",
+                    "session_id": session_id,
                     "player_id": player["player_id"],
                     "session_start": session_start,
                     "session_end": session_end,

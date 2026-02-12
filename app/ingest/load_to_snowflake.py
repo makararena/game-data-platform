@@ -3,7 +3,7 @@ Script to load raw CSV files into Snowflake.
 
 Loads three tables:
 - RAW_PLAYERS
-- RAW_SESSIONS  
+- RAW_SESSIONS
 - RAW_GAME_EVENTS
 
 Requirements:
@@ -21,22 +21,31 @@ Usage:
     SNOWFLAKE_PASSWORD="your_password"
     SNOWFLAKE_ACCOUNT="cwrlboz-pz37526"
     SNOWFLAKE_WAREHOUSE="COMPUTE_WH"
-    
-    # Run the script
+
+    # Run the script (interactive mode selection)
     python load_to_snowflake.py
 
+    # Or choose mode explicitly (non‑interactive):
+    #   --mode recreate  -> create or replace RAW_* tables and load data
+    #   --mode append    -> append new rows to existing RAW_* tables
+    python load_to_snowflake.py --mode recreate
+    python load_to_snowflake.py --mode append
+
 The script will:
-1. Create or replace tables in GAME_ANALYTICS.RAW schema
+1. Either create/replace or reuse existing tables in GAME_ANALYTICS.RAW schema,
+   depending on the chosen mode.
 2. Load data from data/raw_players.csv, data/raw_sessions.csv, data/raw_game_events.csv
 3. Handle VARIANT type for properties column in RAW_GAME_EVENTS
 
 Note: The [pandas] extra is REQUIRED for write_pandas() to work properly.
 """
 
+import argparse
 import os
 import sys
 import json
 from pathlib import Path
+from typing import Literal
 from dotenv import load_dotenv
 
 # Load environment variables from .env file first
@@ -123,6 +132,9 @@ CREATE OR REPLACE TABLE {database}.{schema}.RAW_GAME_EVENTS (
 # =====================
 # HELPERS
 # =====================
+LoadMode = Literal["recreate", "append"]
+
+
 def get_snowflake_connection():
     """Create and return a Snowflake connection."""
     if not SNOWFLAKE_USER or not SNOWFLAKE_PASSWORD:
@@ -141,8 +153,17 @@ def get_snowflake_connection():
     return conn
 
 
-def create_table(conn, schema_sql: str, table_name: str):
-    """Create or replace a table in Snowflake."""
+def create_table(conn, schema_sql: str, table_name: str, mode: LoadMode):
+    """
+    Create or replace a table in Snowflake when running in RECREATE mode.
+
+    In APPEND mode we assume the RAW_* tables already exist. If they do not,
+    the subsequent load step will fail with a clear, student‑friendly error.
+    """
+    if mode != "recreate":
+        # In append mode we never touch table DDL here.
+        return
+
     print(f"Creating/replacing table: {table_name}...")
     cursor = conn.cursor()
     try:
@@ -162,6 +183,7 @@ def load_dataframe_to_snowflake(
     conn,
     df: pd.DataFrame,
     table_name: str,
+    mode: LoadMode,
 ):
     """
     Load a pandas DataFrame into Snowflake.
@@ -170,6 +192,7 @@ def load_dataframe_to_snowflake(
         conn: Snowflake connection
         df: DataFrame to load
         table_name: Target table name
+        mode: "recreate" (overwrite table contents) or "append" (add new rows)
     """
     print(f"\nLoading {len(df)} rows into {table_name}...")
     
@@ -187,7 +210,7 @@ def load_dataframe_to_snowflake(
             database=SNOWFLAKE_DATABASE,
             schema=SNOWFLAKE_SCHEMA,
             auto_create_table=False,
-            overwrite=True,
+            overwrite=(mode == "recreate"),
         )
         
         if success:
@@ -195,6 +218,23 @@ def load_dataframe_to_snowflake(
         else:
             print(f"❌ Failed to load data into {table_name}")
             
+    except snowflake.connector.errors.ProgrammingError as e:
+        # Common failure when tables do not exist in append mode
+        if "does not exist" in str(e) and mode == "append":
+            print(
+                f"❌ Error loading data into {table_name}: table does not exist.\n"
+                "   You selected APPEND mode, but the RAW tables have not been "
+                "created yet.\n"
+                "   Run this script once in RECREATE mode first to create the base "
+                "tables, then rerun in APPEND mode to add new data."
+            )
+            raise
+        print(f"❌ Error loading data into {table_name}: {e}")
+        # Print more debug info
+        print(f"   DataFrame type: {type(df)}")
+        print(f"   DataFrame index type: {type(df.index)}")
+        print(f"   Pandas version: {pd.__version__}")
+        raise
     except Exception as e:
         print(f"❌ Error loading data into {table_name}: {e}")
         # Print more debug info
@@ -204,46 +244,46 @@ def load_dataframe_to_snowflake(
         raise
 
 
-def load_players(conn):
+def load_players(conn, mode: LoadMode):
     """Load players data."""
     print("\n" + "="*60)
     print("Loading RAW_PLAYERS")
     print("="*60)
     
-    # Create table
-    create_table(conn, RAW_PLAYERS_SCHEMA, "RAW_PLAYERS")
+    # Create or reuse table depending on mode
+    create_table(conn, RAW_PLAYERS_SCHEMA, "RAW_PLAYERS", mode)
     
     # Load data
     df = pd.read_csv(PLAYERS_CSV, parse_dates=["first_seen_at"])
 
-    load_dataframe_to_snowflake(conn, df, "RAW_PLAYERS")
+    load_dataframe_to_snowflake(conn, df, "RAW_PLAYERS", mode)
 
 
-def load_sessions(conn):
+def load_sessions(conn, mode: LoadMode):
     """Load sessions data."""
     print("\n" + "="*60)
     print("Loading RAW_SESSIONS")
     print("="*60)
     
-    # Create table
-    create_table(conn, RAW_SESSIONS_SCHEMA, "RAW_SESSIONS")
+    # Create or reuse table depending on mode
+    create_table(conn, RAW_SESSIONS_SCHEMA, "RAW_SESSIONS", mode)
     
     # Load data
     df = pd.read_csv(
         SESSIONS_CSV,
         parse_dates=["session_start", "session_end"]
     )
-    load_dataframe_to_snowflake(conn, df, "RAW_SESSIONS")
+    load_dataframe_to_snowflake(conn, df, "RAW_SESSIONS", mode)
 
 
-def load_game_events(conn):
+def load_game_events(conn, mode: LoadMode):
     """Load game events data."""
     print("\n" + "="*60)
     print("Loading RAW_GAME_EVENTS")
     print("="*60)
     
-    # Create table
-    create_table(conn, RAW_GAME_EVENTS_SCHEMA, "RAW_GAME_EVENTS")
+    # Create or reuse table depending on mode
+    create_table(conn, RAW_GAME_EVENTS_SCHEMA, "RAW_GAME_EVENTS", mode)
     
     # Load data
     df = pd.read_csv(
@@ -266,7 +306,35 @@ def load_game_events(conn):
         
         df["properties"] = df["properties"].apply(parse_properties)
     
-    load_dataframe_to_snowflake(conn, df, "RAW_GAME_EVENTS")
+    load_dataframe_to_snowflake(conn, df, "RAW_GAME_EVENTS", mode)
+
+
+def _prompt_load_mode() -> LoadMode:
+    """
+    Ask the user how data should be loaded: recreate vs append.
+
+    This is the main UX for students running the script manually or via
+    run_platform.sh. If stdin is not interactive, we silently default to
+    RECREATE to preserve previous behaviour.
+    """
+    # Non‑interactive / piped execution: preserve old behaviour.
+    if not sys.stdin.isatty():
+        return "recreate"
+
+    print("\n" + "=" * 60)
+    print("How should data be loaded into Snowflake?")
+    print("=" * 60)
+    print("1) RECREATE: create or replace RAW_* tables and load seed data")
+    print("   - Use this the first time you run the course.")
+    print("   - Safe reset: drops existing RAW_* contents for a clean start.\n")
+    print("2) APPEND: keep existing RAW_* tables and append only new rows")
+    print("   - Use this later (e.g. around Task 8) when you")
+    print("     want to simulate an incremental load with new data.\n")
+
+    choice = input("Choose load mode [1=recreate, 2=append] (default: 1): ").strip()
+    if choice == "2":
+        return "append"
+    return "recreate"
 
 
 # =====================
@@ -274,12 +342,30 @@ def load_game_events(conn):
 # =====================
 def main():
     """Main function to load all data into Snowflake."""
+    parser = argparse.ArgumentParser(
+        description="Load CSV data into Snowflake RAW_* tables."
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["recreate", "append"],
+        default=None,
+        help=(
+            "Load mode: 'recreate' (create or replace RAW_* tables) or "
+            "'append' (append new rows only). "
+            "If omitted, you will be prompted interactively."
+        ),
+    )
+    args = parser.parse_args()
+
+    mode: LoadMode = args.mode or _prompt_load_mode()
+
     print("\n" + "="*60)
     print("🚀 Starting Snowflake Data Load")
     print("="*60)
     print(f"Database: {SNOWFLAKE_DATABASE}")
     print(f"Schema: {SNOWFLAKE_SCHEMA}")
     print(f"Account: {SNOWFLAKE_ACCOUNT}")
+    print(f"Load mode: {mode.upper()}")
     print("="*60)
     
     # Verify files exist
@@ -300,9 +386,9 @@ def main():
     
     try:
         # Load each table
-        load_players(conn)
-        load_sessions(conn)
-        load_game_events(conn)
+        load_players(conn, mode)
+        load_sessions(conn, mode)
+        load_game_events(conn, mode)
         
         print("\n" + "="*60)
         print("✨ All data loaded successfully!")

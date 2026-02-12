@@ -65,19 +65,64 @@ Config (edit in `main.py` or pass via env):
 - `MAX_SESSIONS_PER_PLAYER` – max sessions per player (default: 25)
 - `GAME_VERSION` – version string for events (default: `1.0.3`)
 - `GAME_DATA_SEED` – random seed (default: `42`). Same seed ensures **every run produces the same data** for all users, so everyone can compare dbt results on identical inputs.
+- `LOAD_BATCH_ID` – batch ID (default: 1). Use `--batch 2` or higher for incremental: **new users, sessions, events** with unique IDs.
 
 ### 2. Load into Snowflake
 
-Creates or replaces `RAW_PLAYERS`, `RAW_SESSIONS`, and `RAW_GAME_EVENTS` in the configured database/schema and loads from `data/raw_players.csv`, `data/raw_sessions.csv`, `data/raw_game_events.csv`.
+Loads CSVs into three Snowflake tables:
+
+- `RAW_PLAYERS`
+- `RAW_SESSIONS`
+- `RAW_GAME_EVENTS`
+
+There are **two load modes**:
+
+- **RECREATE** – create or replace the RAW tables and load data (fresh start).
+- **APPEND** – keep existing RAW tables and **append only new rows**.
+
+Interactive usage (recommended for students):
 
 ```bash
 # From this directory (app/)
 python ingest/load_to_snowflake.py
 ```
 
-Run from this directory so paths to `data/` resolve correctly. The script expects the Snowflake `[pandas]` extra for `write_pandas()`.
+You will be asked whether you want to **recreate** the tables (first run,
+or when you want a full reset) or **append** new data (e.g. later in the
+course when testing incremental models).
 
-### 3. Transform with dbt
+Non-interactive usage (CI / automation):
+
+```bash
+# RECREATE mode: drop & reload RAW tables
+python ingest/load_to_snowflake.py --mode recreate
+
+# APPEND mode: keep existing RAW tables and add new rows
+python ingest/load_to_snowflake.py --mode append
+```
+
+Run from this directory so paths to `data/` resolve correctly. The script
+expects the Snowflake `[pandas]` extra for `write_pandas()`.
+
+### 3. Test incremental load (new users, sessions, events)
+
+For incremental dbt testing, generate a **new batch** of users with unique IDs:
+
+```bash
+# 1. Initial full load: generate + load (RECREATE)
+python app/main.py
+
+# 2. Generate an incremental batch: new users, sessions, events
+#    Use --batch 2+ and a later date range; no overlap with previous data
+python app/main.py --batch 2 --start 2011-02-13 --end 2011-03-15 --no-ingest
+
+# 3. Append the new batch into Snowflake
+python app/ingest/load_to_snowflake.py --mode append
+```
+
+For batch 2+, IDs are namespaced: `player_2_1`, `session_2_1`, `event_2_0`, etc., so no duplicates with batch 1.
+
+### 4. Transform with dbt
 
 After data is in Snowflake, run the dbt project (sibling of `game-data-platform/`) to build staging and marts:
 

@@ -10,6 +10,7 @@ Usage:
     python main.py                           # generate + load (default: last 90 days)
     python main.py --start 2024-01-01 --end 2024-12-31
     python main.py --no-ingest               # generate only
+    python main.py --batch 2 --start 2011-02-13 --end 2011-03-15  # incremental: new users, sessions, events
 """
 
 import argparse
@@ -20,16 +21,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 
-# =====================
-# CONFIGURATION
-# =====================
-def _default_date_range():
-    end = datetime.utcnow().date()
-    start = end - timedelta(days=30)
-    return start.isoformat(), end.isoformat()
-
-
-DEFAULT_START, DEFAULT_END = _default_date_range()
+DEFAULT_START = "2011-01-13"
+DEFAULT_END = "2011-02-12"
 
 CONFIG = {
     "N_PLAYERS": 2000,
@@ -38,6 +31,7 @@ CONFIG = {
     "EVENT_DATE_START": DEFAULT_START,
     "EVENT_DATE_END": DEFAULT_END,
     "GAME_DATA_SEED": "42",  # Fixed seed so every run produces the same data for all users
+    "LOAD_BATCH_ID": "1",  # Batch 2+ = new users/sessions/events for incremental APPEND testing
 }
 
 SCRIPTS = [
@@ -48,6 +42,7 @@ SCRIPTS = [
             "EVENT_DATE_START": CONFIG["EVENT_DATE_START"],
             "EVENT_DATE_END": CONFIG["EVENT_DATE_END"],
             "GAME_DATA_SEED": CONFIG["GAME_DATA_SEED"],
+            "LOAD_BATCH_ID": CONFIG["LOAD_BATCH_ID"],
         },
     },
     {
@@ -57,6 +52,7 @@ SCRIPTS = [
             "EVENT_DATE_START": CONFIG["EVENT_DATE_START"],
             "EVENT_DATE_END": CONFIG["EVENT_DATE_END"],
             "GAME_DATA_SEED": CONFIG["GAME_DATA_SEED"],
+            "LOAD_BATCH_ID": CONFIG["LOAD_BATCH_ID"],
         },
     },
     {
@@ -66,6 +62,7 @@ SCRIPTS = [
             "EVENT_DATE_START": CONFIG["EVENT_DATE_START"],
             "EVENT_DATE_END": CONFIG["EVENT_DATE_END"],
             "GAME_DATA_SEED": CONFIG["GAME_DATA_SEED"],
+            "LOAD_BATCH_ID": CONFIG["LOAD_BATCH_ID"],
         },
     },
 ]
@@ -158,15 +155,24 @@ def main():
         default=None,
         help=f"Event date range end (default: {DEFAULT_END})",
     )
+    parser.add_argument(
+        "--batch",
+        metavar="N",
+        type=int,
+        default=1,
+        help="Load batch ID (default: 1). Use 2+ for incremental: new users, sessions, events with unique IDs.",
+    )
     args = parser.parse_args()
 
     event_start = args.start or CONFIG["EVENT_DATE_START"]
     event_end = args.end or CONFIG["EVENT_DATE_END"]
     CONFIG["EVENT_DATE_START"] = event_start
     CONFIG["EVENT_DATE_END"] = event_end
+    CONFIG["LOAD_BATCH_ID"] = str(args.batch)
     for script_config in SCRIPTS:
         script_config["env"]["EVENT_DATE_START"] = event_start
         script_config["env"]["EVENT_DATE_END"] = event_end
+        script_config["env"]["LOAD_BATCH_ID"] = CONFIG["LOAD_BATCH_ID"]
 
     project_root = Path(__file__).resolve().parent
     gen_dir = project_root / "gen"

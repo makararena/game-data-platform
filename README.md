@@ -6,7 +6,7 @@ A hands-on project to build an analytics warehouse for a narrative game. You run
 
 ## The Story
 
-![Joel and Ellie in the post-apocalyptic world of The Last of Us](images/img.png)
+![Joel and Ellie in the post-apocalyptic world of The Last of Us](images/last-of-us/img.png)
 
 It’s **2012** in Santa Monica. You’re on the team building **The Last of Us** — the story of Joel and Ellie is on the page, the levels are greyboxed, and combat is being tuned week by week. Design keeps asking: *Where do players die the most? Do they come back after the first session? Which chapters get abandoned?* Right now the answer is usually “we’ll check the build and the forums.” You’ve already wired the game to emit events and dump them into pipelines, but there’s no single place to go for “how many players, how many sessions, where they drop.” Someone has to turn that raw firehose into tables the team can actually use. That someone is you.
 
@@ -24,24 +24,79 @@ The game is at **MVP**: a few key flows are playable end-to-end, and telemetry i
 
 The hierarchy is simple: **player → sessions → events**. Your job is to turn that into a warehouse: define sources, stage and clean the data, build dimensions and facts (dim_players, fct_sessions, fct_game_events), add analytics marts (DAU, funnel, retention), and harden everything with tests and CI. When you’re done, the team can stop guessing and start answering — and you’ll have done it step by step, by following the tasks below. No prior dbt experience required.
 
+### Schema hierarchy (entities and relationships)
+
+There are **three entities**; all relationships are **one-to-many** (no many-to-many in the core model):
+
+| Entity   | Raw table        | Grain              | Relationship                          |
+|----------|------------------|--------------------|---------------------------------------|
+| **Player**  | `RAW_PLAYERS`    | One row per player | One player has **many** sessions      |
+| **Session** | `RAW_SESSIONS`   | One row per session| One session has **many** events       |
+| **Event**   | `RAW_GAME_EVENTS`| One row per event  | Belongs to exactly one session (and thus one player) |
+
+```
+┌─────────────┐      1:N      ┌─────────────┐      1:N      ┌─────────────┐
+│   PLAYER    │──────────────>│   SESSION   │──────────────>│    EVENT    │
+├─────────────┤               ├─────────────┤               ├─────────────┤
+│ player_id   │               │ session_id  │               │ event_id    │
+│ first_seen  │               │ player_id   │               │ session_id  │
+│ country     │               │ start/end   │               │ player_id   │
+│ language    │               │ platform    │               │ event_name  │
+│ difficulty  │               │             │               │ event_at    │
+└─────────────┘               └─────────────┘               │ properties  │
+                                                            └─────────────┘
+```
+
+In short: **Player 1 → N Sessions → N Events**. Events are tied to a session via `session_id` (and to a player via `player_id`); sessions are tied to a player via `player_id`.
+
+---
+
+## Quick start
+
+If you just want to get data into Snowflake as quickly as possible, run the
+bootstrap script from the root of this repo:
+
+```bash
+chmod +x run_platform.sh   # first time only
+./run_platform.sh
+```
+
+This script will:
+
+1. Prompt you for your **Snowflake credentials**.
+2. Write them into `app/.env` in the expected format.
+3. Create a Python virtualenv in `app/.venv` and install dependencies.
+4. Run the pipeline to **generate synthetic CSVs** (players, sessions, events).
+5. Run the Snowflake loader to **populate `RAW_PLAYERS`, `RAW_SESSIONS`,
+   `RAW_GAME_EVENTS`**.
+
+During the load step, the script will ask whether you want to:
+
+- **Recreate** the RAW tables from the seed data (first run, or to reset).
+- **Append** only new data on top of existing RAW tables (useful later in the
+  course when you work on incremental models in Task 8).
+
+After `run_platform.sh` finishes, your Snowflake database will have the
+`RAW_*` tables ready. Next, create your dbt project and connect it to Snowflake — see [dbt setup](instructions/dbt-setup.md).
+
 ---
 
 ## How It Works
 
-1. **Game Data Platform** (`game-data-platform/`)  
+1. **Game Data Platform** (this repo)  
    A Python pipeline that:
    - **Generates** synthetic players, sessions, and game events (CSVs).
    - **Loads** them into Snowflake as `RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS`.
 
-2. **dbt Project** (`game-dbt-project/`)  
-   You (or the reference solution) build:
+2. **Your dbt project** (you create it)  
+   You create a dbt project and build:
    - **Raw** — source definitions pointing at those tables.
    - **Staging** — views that clean, rename, and type the raw data.
    - **Marts** — core (dimensions + facts) and analytics (DAU, funnel, retention).
    - **Macros** — e.g. schema naming for dev/ci/prod.
    - **Tests** — not null, unique, relationships, and a custom business rule (e.g. no overlapping sessions).
 
-You run the platform once to get data, then work through the dbt tasks. Every step is something you can do yourself; the repos provide the structure and (optionally) the reference implementation.
+You run the platform once to get data, then set up dbt and work through the tasks. See [dbt setup](instructions/dbt-setup.md) for how to get started with dbt.
 
 ---
 
@@ -93,11 +148,11 @@ game_analytics:
       threads: 4
 ```
 
-</details>
-
----
-
-## Tasks (Do It Yourself)
+ </details>
+ 
+ ---
+ 
+ ## Tasks (Do It Yourself)
 
 Do the tasks in order. Each task is a single, clear step from start to finish.
 
@@ -107,7 +162,7 @@ Do the tasks in order. Each task is a single, clear step from start to finish.
 
 - [ ] **0.1** Clone the repo. In `app/` (this folder’s pipeline code), create a venv, install `requirements.txt`, and add a `.env` with Snowflake credentials (user, password, account, warehouse, database, schema). See [app/README.md](app/README.md) for setup.
 - [ ] **0.2** From this folder (`game-data-platform/`), run `python app/main.py` (or `cd app && python main.py`) to generate CSVs and load them into Snowflake as `RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS`.
-- [ ] **0.3** In the sibling `game-dbt-project/` folder, install dbt (e.g. `pip install dbt-snowflake`), create `~/.dbt/profiles.yml` with profile `game_analytics` pointing at your Snowflake database and schema, and run `dbt deps`.
+- [ ] **0.3** Create your own dbt project (see [dbt setup](instructions/dbt-setup.md)), install dbt (e.g. `pip install dbt-snowflake`), create `~/.dbt/profiles.yml` with profile `game_analytics` pointing at your Snowflake database and schema, and run `dbt deps`.
 
 <details>
 <summary>Answer — Phase 0</summary>
@@ -120,6 +175,10 @@ Do the tasks in order. Each task is a single, clear step from start to finish.
 
 - You set up the runtime pieces (virtualenv, Snowflake credentials, dbt profile) so every other step can run consistently.
 - Having a dedicated `app/` and clear configs makes it easy for others to clone the repo and reproduce your warehouse.
+
+**Progress bar (after Phase 0 — setup done, 0/8 core phases):**
+
+| <span style="color:#22c55e"></span><span style="color:#9ca3af">################</span> | **0% (0/8 phases complete)** |
 
 ---
 
@@ -148,6 +207,10 @@ sources:
 
 - Defining sources with columns and tests turns your raw Snowflake tables into a documented contract for the rest of the project.
 - Catching issues (bad values, missing keys) at the source layer keeps downstream models simpler and failures easier to debug.
+
+**Progress bar (after Phase 1):**
+
+| <span style="color:#22c55e">##</span><span style="color:#9ca3af">##############</span> | **12.5% (1/8 phases complete)** |
 
 ---
 
@@ -188,6 +251,10 @@ select * from source  -- add event_at, lower(event_name), lower(platform)
 
 - Staging models clean and standardize the raw data so all downstream tables share the same names, types, and semantics.
 - This is where you remove one-off quirks from ingestion and give analytics engineers a stable, well-typed surface to build on.
+
+**Progress bar (after Phase 2):**
+
+| <span style="color:#22c55e">####</span><span style="color:#9ca3af">############</span> | **25% (2/8 phases complete)** | 
 
 ---
 
@@ -285,6 +352,10 @@ models:
 - Core marts (dimensions and facts) are the main interface between raw data and analytics: almost every metric is built on them.
 - Getting join keys, grain, and aggregations right here prevents subtle bugs in every dashboard and analysis that follows.
 
+**Progress bar (after Phase 3):**
+
+| <span style="color:#22c55e">######</span><span style="color:#9ca3af">##########</span> | **37.5% (3/8 phases complete)** |
+
 ### Phase 4: Analytics marts
 
 **daily_active_players**
@@ -350,6 +421,10 @@ with players as ( select player_id, country_code, difficulty_selected, date(firs
 - Analytics marts (DAU, funnel, retention) translate raw behavioral data into the KPIs your team actually discusses.
 - By keeping these as dbt models, you can iterate on definitions (e.g. what counts as active) with version control and tests instead of ad hoc SQL.
 
+**Progress bar (after Phase 4):**
+
+| <span style="color:#22c55e">########</span><span style="color:#9ca3af">########</span> | **50% (4/8 phases complete)** |
+
 ### Phase 5: Macros and project config
 
 - [ ] **5.1** Add macro **generate_schema_name(custom_schema_name, node)** so that when `custom_schema_name` is set it is used, otherwise use `target.schema`. (This lets staging and marts build into different schemas when you set `+schema` in dbt_project.)
@@ -383,6 +458,10 @@ models:
 - Centralizing environment settings (schemas, materializations) keeps dev, CI, and prod aligned without copying SQL.
 - Small macros like `generate_schema_name` make it easy to add more environments later without rewriting models.
 
+**Progress bar (after Phase 5):**
+
+| <span style="color:#22c55e">##########</span><span style="color:#9ca3af">######</span> | **62.5% (5/8 phases complete)** |
+
 ### Phase 6: Tests and quality
 
 - [ ] **6.1** In schema YAMLs, ensure primary key columns have `unique` and `not_null`; foreign keys have `relationships` to the referenced model. Add `not_null` (or accepted_values) on other critical columns.
@@ -409,6 +488,10 @@ tests:
 
 - Tests turn your warehouse into something you can trust: they catch broken assumptions as soon as data or code changes.
 - Encoding business rules (like no overlapping sessions) in tests prevents silent data drift that would invalidate product decisions.
+
+**Progress bar (after Phase 6):**
+
+| <span style="color:#22c55e">############</span><span style="color:#9ca3af">####</span> | **75% (6/8 phases complete)** |
 
 ### Phase 7: CI
 
@@ -442,6 +525,9 @@ jobs:
 - CI ensures every change to models or tests is exercised automatically before it reaches main.
 - When CI fails on bad data or broken contracts, you find issues in pull requests instead of in production dashboards.
 
+**Progress bar (after Phase 7):**
+
+| <span style="color:#22c55e">##############</span><span style="color:#9ca3af">##</span> | **87.5% (7/8 phases complete)** |
 
 ---
 
@@ -486,12 +572,17 @@ with events as (
 - Real production warehouses rarely rebuild large event tables from scratch — **incremental models** keep compute + cost under control.
 - Designing a correct incremental filter (grain, unique key, late-arriving data) forces you to think carefully about **time, idempotency, and data correctness**.
 
+**Progress bar (after Phase 8):**
+
+| <span style="color:#22c55e">################</span><span style="color:#9ca3af"></span> | **100% (8/8 phases complete)** |
+
+Congratulations — you’ve completed all 8 core phases. The bar is fully green; the bonus *Final Boss* below is represented by a golden segment.
 
 ---
 
 ## 🏁 Final Boss: Product Questions You Must Be Able to Answer
 
-![Bloater](images/bloater.png)
+![Bloater](images/last-of-us/bloater.png)
 
 You didn't build a warehouse to admire clean models. You built it to answer hard product questions.
 
@@ -505,6 +596,12 @@ After completing all phases (sources → staging → marts → tests → CI), yo
 - `retention`
 
 If you can answer these — your warehouse is working.
+
+**Bonus progress (Final Boss questions):**
+
+| <span style="color:#22c55e">################</span><span style="color:#eab308">####</span> | **Core 100% + Final Boss bonus** |
+
+Green represents the 8 core phases; the golden segment corresponds to answering all of the questions in this section.
 
 ### 🎮 1. Retention & Player Return
 
@@ -661,8 +758,8 @@ At that point, you are no longer "building tables." You are running a game analy
 
 | Path | Purpose |
 |------|--------|
-| **This folder** (`game-data-platform/`) | Story and task list (this README). Run `python app/main.py` from here to generate and load data. Pipeline details in [app/README.md](app/README.md). |
+| **This folder** (`game-data-platform/`) | Story and task list (this README). Run `./run_platform.sh` or `python app/main.py` from here to generate and load data. Pipeline details in [app/README.md](app/README.md). |
 | `app/` | Pipeline code: gen, ingest, main. See [app/README.md](app/README.md). |
-| `game-dbt-project/` (sibling) | dbt project: sources → staging → marts, macros, tests. Run `dbt build` after data is loaded. |
+| **Your dbt project** | You create it. See [dbt setup](instructions/dbt-setup.md). Then build sources → staging → marts; run `dbt build` after data is loaded. |
 
-Start with the platform to get data; then work through the dbt tasks in order. When you’re done, you’ll have a full story: from “raw events in Snowflake” to “tables ready for DAU, funnel, and retention.”
+Start with the platform to get data; then set up dbt and work through the tasks in order. When you’re done, you’ll have a full story: from “raw events in Snowflake” to “tables ready for DAU, funnel, and retention.”

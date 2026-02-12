@@ -1,82 +1,76 @@
-## Creating a Snowflake account (for this project)
+# Snowflake account setup (5 steps)
 
-This project assumes you have access to a **Snowflake account**.  
-There are two common paths:
+Follow these steps to create a Snowflake account for this project. You will need your **username** and **password** later for the other instructions (credentials and dbt profile).
 
-1. **Course-provided account** (recommended for workshops / classes)
-2. **Free Snowflake trial** (if you are doing this on your own)
+> **Tip:** YouTube has many step-by-step videos for setting up a Snowflake account. If the screens below look different on your side, search for something like “Snowflake free trial sign up” and **pick the most recent video** — the UI changes over time, and following an up-to-date walkthrough can be easier than written steps alone.
 
 ---
 
-### 1. Course-provided account
+## Step 1: Open the sign-up page
 
-If you are doing this as part of a **course, bootcamp, or workshop**, your instructor may give you:
+1. Go to **[https://www.snowflake.com/en/](https://www.snowflake.com/en/)**.
+2. Click **Start for free** (or equivalent sign-up link).
 
-- A Snowflake **URL** (e.g. `https://cwrlboz-pz37526.snowflakecomputing.com`)
-- A **username** and temporary **password**
-- The **role**, **warehouse**, and **database/schema** you should use
-
-In that case:
-
-1. Follow the instructor’s onboarding docs to log in the first time and change your password.
-2. Keep the following values handy (you’ll need them for `.env` and your dbt profile):
-   - Account identifier (e.g. `cwrlboz-pz37526`)
-   - Username and password
-   - Warehouse name (e.g. `COMPUTE_WH`, `TRANSFORMING`)
-   - Database and schema names where you are allowed to create tables
-3. Put these values into:
-   - `game-data-platform/app/.env` (or `game-data-platform/.env`)  
-   - Your `~/.dbt/profiles.yml` (for the dbt project)
-
-> See `snowflake-credentials.md` in this folder for exact variable names and file formats.
+![Start for free / Create or sign in](../images/snowflake/create-or-sign-in.png)
 
 ---
 
-### 2. Free Snowflake trial (self‑study)
+## Step 2: Fill in your details (first screen)
 
-If you are doing this independently, you can sign up for a **free Snowflake trial**:
+On the first sign-up screen:
 
-1. Go to the official Snowflake site and start a **free trial**:
-   - Search for “Snowflake free trial” in your browser and follow the official link.
-2. During signup, pick:
-   - A **cloud provider** and **region** close to you.
-   - An account name (Snowflake will generate an identifier like `xy12345.eu-central-1`).
-3. After signup:
-   - Log in to the Snowflake web UI.
-   - Note your **account identifier** from the URL.
-   - Create (or identify) a **warehouse** you can use.
-
-You will then:
-
-- Create a **database** for this course (see `pre-launch-setup.md`).
-- Create a **schema** for raw tables (e.g. `RAW`).
-- Optionally create a **dev schema** for dbt models (e.g. `DEV`).
+1. Enter your **first name** and **last name**.
+2. Enter your **work email** or any other email you use.
+3. Choose the **reason** you are signing up (e.g. “Try Snowflake”, “Evaluate”, etc.).
+4. Tick the **agreement / terms** checkbox.
+5. Click **Continue**.
 
 ---
 
-### 3. Mapping Snowflake UI to the values we use
+## Step 3: Choose cloud, region, and edition (second screen)
 
-In the Snowflake UI you will see:
+On the next screen:
 
-- **Account URL**  
-  - Example: `https://xy12345.eu-central-1.snowflakecomputing.com`  
-  - We use: `SNOWFLAKE_ACCOUNT=xy12345.eu-central-1`
+1. Enter your **company name** and **job title**.
+2. Choose where to run Snowflake:
+   - **Microsoft Azure**, or  
+   - **Amazon Web Services**, or  
+   - **Google Cloud Platform**
+3. Choose a **region** (e.g. one close to you).
+4. Choose the **Snowflake edition** — for this project, **Standard** is enough.
+5. Click **Continue**.
 
-- **User**  
-  - Example: `JOEL`  
-  - We use: `SNOWFLAKE_USER=JOEL`
+![Setup account – cloud, region, edition](../images/snowflake/setup-account.png)
 
-- **Warehouse**  
-  - Example: `COMPUTE_WH`  
-  - We use: `SNOWFLAKE_WAREHOUSE=COMPUTE_WH`
+---
 
-- **Database**  
-  - Example: `GAME_ANALYTICS`  
-  - We use: `SNOWFLAKE_DATABASE=GAME_ANALYTICS`
+## Step 4: Check your inbox
 
-- **Schema**  
-  - Example: `RAW`  
-  - We use: `SNOWFLAKE_SCHEMA=RAW`
+1. Wait for the **email** from Snowflake to arrive in your inbox.
+2. Open it and use the link (or instructions) to **activate your account** and continue to the setup page.
 
-> Again, see `snowflake-credentials.md` for the `.env` snippet you can copy‑paste.
+![Check your inbox](../images/snowflake/check-your-inbox.png)
 
+---
+
+## Step 5: Set your username and password
+
+1. In the setup window, choose your **username**.
+2. Set your **password** and **confirm** it (type it again).
+3. **Write down your username and password** somewhere safe — you will need them for:
+   - `app/.env` (Snowflake credentials)
+   - Your dbt profile (`~/.dbt/profiles.yml`)
+
+See the other instructions in this folder for where to put these values.
+
+![Setup username and password](../images/snowflake/setup-username-password.png)
+
+---
+
+## After you have an account
+
+- **Account identifier**: You will see it in the Snowflake URL (e.g. `xy12345.eu-central-1`) or in the UI. Use it as `SNOWFLAKE_ACCOUNT` in `.env`.
+- **Warehouse**: Use the default warehouse name (e.g. `COMPUTE_WH`) or one assigned to you — that is `SNOWFLAKE_WAREHOUSE`.
+- **Database and schema**: Create them (or use existing ones) as described in **pre-launch-setup.md**; then set `SNOWFLAKE_DATABASE` and `SNOWFLAKE_SCHEMA` in `.env`.
+
+For the exact variable names and file format, see **snowflake-credentials.md**.
