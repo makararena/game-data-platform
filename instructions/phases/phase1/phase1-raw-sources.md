@@ -51,7 +51,7 @@ In each file, define the **same** source block so dbt can merge them:
 
 **Why the same source block in every file:** dbt treats sources with the same `name` (and same `database`/`schema` when set) as one logical source. Each file adds its *tables* to that source; the source-level keys (name, description, database, schema) must match so dbt doesn’t create duplicate sources.
 
-**Why `target.database` and `target.schema`:** The ingest loads raw tables into the same database/schema as the one you use for dbt (e.g. dev vs prod). Using `target` keeps sources correct when you run `dbt run --target dev` or `--target prod` without hardcoding names. One schema for all raw tables keeps the setup simple and matches the typical “one raw schema” pattern.
+**Why `target.database` and `target.schema`:** The ingest loads raw tables into the same database/schema as the one you use for dbt (e.g. dev vs prod). Using `target` keeps sources correct when you run `dbt run --target dev` or `--target prod` without hardcoding names. When you have multiple schemas (e.g. RAW for sources, STAGING for staging), use `schema: "{{ var('raw_schema', 'RAW') }}"` in sources and define `raw_schema` in `dbt_project.yml`. Otherwise one schema for all raw tables keeps the setup simple and matches the typical “one raw schema” pattern.
 
 ---
 
