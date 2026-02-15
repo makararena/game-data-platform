@@ -4,7 +4,7 @@ This file gives the full YAML solution for Phase 1. Try the [task](phase1-raw-so
 
 ---
 
-## File 1: `models/sources/raw_players.yml`
+## File 1: `sources/raw_players.yml`
 
 ```yaml
 # Raw layer: players table (loaded by game-data-platform ingest).
@@ -44,7 +44,7 @@ sources:
 
 ---
 
-## File 2: `models/sources/raw_sessions.yml`
+## File 2: `sources/raw_sessions.yml`
 
 ```yaml
 # Raw layer: sessions table (loaded by game-data-platform ingest).
@@ -84,7 +84,7 @@ sources:
 
 ---
 
-## File 3: `models/sources/raw_game_events.yml`
+## File 3: `sources/raw_game_events.yml`
 
 ```yaml
 # Raw layer: game_events table (loaded by game-data-platform ingest).

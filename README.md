@@ -129,12 +129,7 @@ Verify each of the following:
 
 ### Phase 1: Raw layer (sources)
 
-- [ ] **1.1** Create a source named `raw` that points to the three raw tables: `raw_players`, `raw_sessions`, `raw_game_events`. Set database and schema (e.g. from `target`). Add a short description per table.
-- [ ] **1.2** Add column definitions for each source table and source tests: `unique` and `not_null` on primary keys, `accepted_values` on difficulty and platform.
-
 **Instructions:** [Phase 1 — Task](instructions/phases/phase1/phase1-raw-sources.md) · [Phase 1 — Check yourself](instructions/phases/phase1/phase1-raw-sources-check-yourself.md)
-
-Defining sources with columns and tests turns your raw Snowflake tables into a documented contract; catching issues at the source layer keeps downstream models simpler.
 
 ---
 
