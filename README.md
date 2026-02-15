@@ -120,12 +120,9 @@ Verify each of the following:
    - **RAW_GAME_EVENTS** (e.g. ~231K rows: event_id, event_time, player_id, event_name, platform)  
      ![RAW_GAME_EVENTS data preview](images/check-yourself-0/raw_game_events.png)
 
-4. **Separate dbt folder at repo root** — Your repo root contains a dedicated folder for the dbt project (e.g. `dbt-project`), not mixed with the game-data-platform app.  
-   ![Root folder with separate dbt-project](images/check-yourself-0/root-folder.png)
+4. **dbt project and venv in parent directory** — One level up from `game-data-platform` you have your dbt project folder (created by `dbt init`) and a `venv` for dbt. You run dbt from the project folder with the venv activated.
 
-5. **Virtual environment in the dbt folder** — Inside that dbt project folder (e.g. `dbt-project`) there is a `venv` (or similar) directory for the Python/dbt environment.
-
-6. **dbt debug passes** — From your dbt project directory, run `dbt debug`. The output shows all checks passed (connection, profile, and project config).  
+5. **dbt debug passes** — From your dbt project directory, run `dbt debug`. The output shows all checks passed (connection, profile, and project config).  
    ![dbt debug — all checks passed](images/check-yourself-0/dbt-debug.png)
 
 </details>
@@ -133,28 +130,11 @@ Verify each of the following:
 ### Phase 1: Raw layer (sources)
 
 - [ ] **1.1** Create a source named `raw` that points to the three raw tables: `raw_players`, `raw_sessions`, `raw_game_events`. Set database and schema (e.g. from `target`). Add a short description per table.
-- [ ] **1.2** In the same YAML, add column definitions for each source table (player_id, first_seen_at, country, language, difficulty_selected for players; session_id, player_id, session start/end, platform for sessions; event_id, event_time, player_id, event_name, platform, game_version, properties for events). Add source tests where useful: `unique` and `not_null` on primary keys, `accepted_values` on fields like difficulty or platform.
+- [ ] **1.2** Add column definitions for each source table and source tests: `unique` and `not_null` on primary keys, `accepted_values` on difficulty and platform.
 
-<details>
-<summary>Check yourself (Phase 1 — sources)</summary>
+**Instructions:** [Phase 1 — Task](instructions/phases/phase1/phase1-raw-sources.md) · [Phase 1 — Check yourself](instructions/phases/phase1/phase1-raw-sources-check-yourself.md)
 
-```yaml
-version: 2
-sources:
-  - name: raw
-    database: "{{ target.database }}"
-    schema: "{{ target.schema }}"
-    tables:
-      - name: raw_players
-      # raw_sessions, raw_game_events + columns & tests
-```
-
-</details>
-
-#### Why this phase matters
-
-- Defining sources with columns and tests turns your raw Snowflake tables into a documented contract for the rest of the project.
-- Catching issues (bad values, missing keys) at the source layer keeps downstream models simpler and failures easier to debug.
+Defining sources with columns and tests turns your raw Snowflake tables into a documented contract; catching issues at the source layer keeps downstream models simpler.
 
 ---
 

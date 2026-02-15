@@ -2,44 +2,45 @@
 
 Create your own dbt project (none in this repo). You need Python 3.10+, pip, and Snowflake raw tables + `app/.env` credentials.
 
-**Project structure:** Create the dbt project **outside** the game-data-platform repo. Go up one level from `game-data-platform` (e.g. `cd ..`) and create the dbt folder there so you have two sibling folders: `game-data-platform` and your dbt project (e.g. `dbt-project`). Do not create the dbt project inside game-data-platform.
+**Project structure:** Create the dbt project **outside** the game-data-platform repo. Go up one level from `game-data-platform` (e.g. `cd ..`), run `dbt init` there, then put the venv **inside** the dbt project folder (create it there or move an existing venv in). Add `venv/` to the dbt project’s `.gitignore` if it’s not there. You end up with two siblings: `game-data-platform` and your dbt project folder, with `venv/` inside the dbt project. Do not create the dbt project inside game-data-platform.
 
 **Docs:** [Get started](https://docs.getdbt.com/docs/get-started-dbt) · [Install with pip](https://docs.getdbt.com/docs/core/pip-install)
 
 ---
 
-## 1. Project folder and venv
+## 1. Initialize project in the parent directory
 
-From the **parent** of `game-data-platform` (e.g. after `cd ..`), create a folder for your dbt project and a virtual environment inside it; install dbt into the venv so dependencies are managed in one place.
+From the **parent** of `game-data-platform` (e.g. after `cd ..`), run `dbt init` to create your project folder. You need dbt installed first (e.g. `pip install dbt-core dbt-snowflake` in any env, or install after step 2).
 
 ```bash
 cd ..                        # go up so you're next to game-data-platform
-mkdir dbt-project
-cd dbt-project
-python -m venv venv
-source venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install dbt-core dbt-snowflake
-dbt --version              # check dbt-core + snowflake
+dbt init game_dbt_project    # or any name; dbt creates this folder
+cd game_dbt_project
 ```
 
 ---
 
-## 2. Initialize project
+## 2. Venv inside the dbt project folder
 
-From `dbt-project/` (venv activated), run:
+Create the virtual environment **inside** the dbt project folder (or move an existing venv here). Add `venv/` to this project’s `.gitignore` if it’s not already there.
 
 ```bash
-dbt init game_dbt_project
-cd game_dbt_project
+# you should be in the dbt project folder (the one with dbt_project.yml)
+python -m venv venv
+source venv/bin/activate     # or venv\Scripts\activate on Windows
+python -m pip install --upgrade pip
+python -m pip install dbt-core dbt-snowflake
+dbt --version                # check dbt-core + snowflake
 ```
 
-dbt creates the project and may prompt to set up your profile:
+If you already created a venv in the parent directory, move it into the dbt project folder and add `venv/` to the project’s `.gitignore`.
+
+dbt may prompt to set up your profile when you run commands:
 
 - **Overwrite profile?** If it says "The profile game_dbt_project already exists... Continue and overwrite?" choose `y` to use the wizard or `n` to keep existing `~/.dbt/profiles.yml` and configure it manually (step 3).
 - **If you choose `y`:** pick database `1` (snowflake), then enter account (e.g. `xxxxx-xxxxxxx`), user, authentication `1` (password), password, role (e.g. `ACCOUNTADMIN`), warehouse (e.g. `COMPUTE_WH`), database (e.g. `GAME_ANALYTICS`), schema (e.g. `DEV`), and threads. The profile is written to `~/.dbt/profiles.yml` with the same name as the project (`game_dbt_project`).
 
-**Important:** Run all dbt commands from this project folder (the one that contains `dbt_project.yml`), with the venv activated.
+**Important:** Run all dbt commands from this project folder (the one that contains `dbt_project.yml`), with the venv activated (`source venv/bin/activate`).
 
 ---
 
@@ -77,7 +78,7 @@ In your project’s `dbt_project.yml`, set `profile: 'game_analytics'` (if you c
 
 ## 4. Verify
 
-From the dbt project folder that contains `dbt_project.yml` (e.g. `dbt-project/game_dbt_project/`), with venv activated:
+From the dbt project folder that contains `dbt_project.yml`, with venv activated (`source venv/bin/activate`):
 
 ```bash
 dbt debug

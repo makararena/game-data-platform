@@ -1,6 +1,6 @@
 # Game Data Platform (pipeline)
 
-Python pipeline for generating synthetic game analytics data and loading it into Snowflake. Produces raw CSVs (players, sessions, game events) and ingests them into `GAME_ANALYTICS.RAW` for use by the [game-dbt-project](../../game-dbt-project) transformations.
+Python pipeline for generating synthetic game analytics data and loading it into Snowflake. Produces raw CSVs (players, sessions, game events) and ingests them into `GAME_ANALYTICS.RAW` for use by your dbt project (sibling of `game-data-platform/`; see [dbt setup](../instructions/dbt-setup.md)).
 
 This README lives in `app/`. The main project readme (story + tasks) is in the [parent folder](../README.md).
 
@@ -124,10 +124,12 @@ For batch 2+, IDs are namespaced: `player_2_1`, `session_2_1`, `event_2_0`, etc.
 
 ### 4. Transform with dbt
 
-After data is in Snowflake, run the dbt project (sibling of `game-data-platform/`) to build staging and marts:
+After data is in Snowflake, run the dbt project (in the parent directory; see [dbt setup](../instructions/dbt-setup.md)) to build staging and marts:
 
 ```bash
-cd ../../game-dbt-project   # from app/
+cd ..   # from game-data-platform/ to parent
+cd your_dbt_project   # the folder created by dbt init
+source ../venv/bin/activate   # if needed
 dbt build
 ```
 
