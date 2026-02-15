@@ -259,10 +259,8 @@ if [[ "$RUN_MODE" == "1" ]]; then
   echo
   echo -e "${BOLD}Next steps for you (dbt project):${RESET}"
   echo "  1) Create your dbt project (see instructions/dbt-setup.md)."
-  echo "  2) Configure your dbt profile to point at:"
-  echo "       database = ${SNOWFLAKE_DATABASE}"
-  echo "       schema   = (your dev schema, e.g. DEV)"
-  echo "  3) Start building sources, staging, and marts following the course README."
+  echo "  2) Start building sources, staging, and marts — see the course README:"
+  echo "      https://github.com/makararena/game-data-platform/blob/main/README.md"
   echo
   echo -e "Good luck with the course and happy modeling!"
 fi

@@ -17,7 +17,7 @@ A **database** is a top-level container for your data. Think of it as a folder t
 <details>
 <summary><strong>What is a schema?</strong></summary>
 
-A **schema** lives inside a database and groups related tables. It’s like a subfolder. We use a schema named `RAW` for the tables that the pipeline loads from CSV (e.g. `RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS`). Later, dbt can build other schemas (e.g. `DEV`, `MARTS`) for cleaned and aggregated data.
+A **schema** lives inside a database and groups related tables. It’s like a subfolder. We use several schemas: `RAW` (where the platform loads CSV data), `STAGING` and `MARTS` (where dbt builds staging views and mart tables), and `CI` (where dbt runs in the CI pipeline). Each keeps a layer of the warehouse separate so you can manage permissions and environments cleanly.
 </details>
 
 <details>
@@ -56,7 +56,17 @@ CREATE DATABASE IF NOT EXISTS GAME_ANALYTICS;
 USE DATABASE GAME_ANALYTICS;
 
 CREATE SCHEMA IF NOT EXISTS RAW;
+CREATE SCHEMA IF NOT EXISTS STAGING;
+CREATE SCHEMA IF NOT EXISTS MARTS;
+CREATE SCHEMA IF NOT EXISTS CI;
 ```
+
+**Why we need these schemas**
+
+- **RAW** — The platform loads CSV data here. dbt only reads from RAW; it never writes to it, so raw data stays stable.
+- **STAGING** — dbt builds staging models (cleaned views) here. Separating staging from raw and marts keeps layers clear and lets you refresh or permission them independently.
+- **MARTS** — dbt builds dimensions, facts, and analytics tables here. This is the reporting-ready layer; keeping it in its own schema lets analysts and tools use only marts.
+- **CI** — The CI pipeline (e.g. GitHub Actions) runs dbt in this schema so runs don’t overwrite dev or marts and you can validate changes before merging.
 
 **What each line does:**
 
@@ -67,7 +77,16 @@ CREATE SCHEMA IF NOT EXISTS RAW;
   Switches the rest of the commands to use that database, so the next command runs inside it.
 
 - **`CREATE SCHEMA IF NOT EXISTS RAW;`**  
-  Creates a schema named `RAW` inside `GAME_ANALYTICS`. Schemas are like folders inside a database. The pipeline will create `RAW_PLAYERS`, `RAW_SESSIONS`, and `RAW_GAME_EVENTS` in this schema.
+  Creates the schema where the platform loads raw tables (`RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS`). Raw data stays here and is never overwritten by dbt.
+
+- **`CREATE SCHEMA IF NOT EXISTS STAGING;`**  
+  Creates the schema where dbt will build your **staging models** (cleaned, typed views like `stg_players`, `stg_sessions`, `stg_game_events`). Keeping staging in its own schema separates “cleaned raw” from raw and from marts, and makes it easy to grant access or refresh only this layer.
+
+- **`CREATE SCHEMA IF NOT EXISTS MARTS;`**  
+  Creates the schema where dbt will build your **marts** (dimensions, facts, and analytics tables like `dim_players`, `fct_sessions`, `daily_active_players`). This is the reporting-ready layer; keeping it in a dedicated schema lets analysts and tools query only marts without touching staging or raw.
+
+- **`CREATE SCHEMA IF NOT EXISTS CI;`**  
+  Creates a schema used by the **CI pipeline** (e.g. GitHub Actions) when it runs `dbt build`. CI runs in an isolated schema so they don’t overwrite your dev or marts, and you can validate that models and tests pass before merging code.
 
 ---
 

@@ -72,60 +72,6 @@ The synthetic pipeline uses fixed sets of values. Useful for dbt `accepted_value
 
 ---
 
-## Quick start
-
-If you just want to get data into Snowflake as quickly as possible, run the
-bootstrap script from the root of this repo:
-
-```bash
-chmod +x run_platform.sh   # first time only
-./run_platform.sh
-```
-
-This script will:
-
-1. Prompt you for your **Snowflake credentials**.
-2. Write them into `app/.env` in the expected format.
-3. Create a Python virtualenv in `app/.venv` and install dependencies.
-4. Run the pipeline to **generate synthetic CSVs** (players, sessions, events).
-5. Run the Snowflake loader to **populate `RAW_PLAYERS`, `RAW_SESSIONS`,
-   `RAW_GAME_EVENTS`**.
-
-During the load step, the script will ask whether you want to:
-
-- **Recreate** the RAW tables from the seed data (first run, or to reset).
-- **Append** only new data on top of existing RAW tables (useful later in the
-  course when you work on incremental models in Task 8).
-
-After `run_platform.sh` finishes, your Snowflake database will have the
-`RAW_*` tables ready. Next, create your dbt project and connect it to Snowflake — see [dbt setup](instructions/dbt-setup.md).
-
----
-
-## How It Works
-
-1. **Game Data Platform** (this repo)  
-   A Python pipeline that:
-   - **Generates** synthetic players, sessions, and game events (CSVs).
-   - **Loads** them into Snowflake as `RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS`.
-
-   Before you run it, do the setup in this order:  
-   [1) Snowflake account setup](instructions/snowflake-account-setup.md) → [2) Pre-launch setup](instructions/pre-launch-setup.md) (database & schemas) → [3) Snowflake credentials](instructions/snowflake-credentials.md).
-
-2. **Your dbt project** (you create it)  
-   You create a dbt project and build:
-   - **Raw** — source definitions pointing at those tables.
-   - **Staging** — views that clean, rename, and type the raw data.
-   - **Marts** — core (dimensions + facts) and analytics (DAU, funnel, retention).
-   - **Macros** — e.g. schema naming for dev/ci/prod.
-   - **Tests** — not null, unique, relationships, and a custom business rule (e.g. no overlapping sessions).
-
-   See [dbt setup](instructions/dbt-setup.md) for how to get started with dbt.
-
-You run the platform once to get data, then set up dbt and work through the tasks.
-
----
-
 ## Project Outline
 
 | Layer / Area   | What you build |
@@ -141,7 +87,7 @@ You run the platform once to get data, then set up dbt and work through the task
 
  ---
  
- ## Tasks (Do It Yourself)
+ ## Tasks
 
 Do the tasks in order. Each task is a single, clear step from start to finish.
 
@@ -149,25 +95,37 @@ Do the tasks in order. Each task is a single, clear step from start to finish.
 
 ### Phase 0: Get data and set up dbt
 
-- [ ] **0.1** Clone the repo. In `app/` (this folder’s pipeline code), create a venv, install `requirements.txt`, and add a `.env` with Snowflake credentials (user, password, account, warehouse, database, schema). See [app/README.md](app/README.md) for setup.
-- [ ] **0.2** From this folder (`game-data-platform/`), run `python app/main.py` (or `cd app && python main.py`) to generate CSVs and load them into Snowflake as `RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS`.
-- [ ] **0.3** Create your own dbt project (see [dbt setup](instructions/dbt-setup.md)), install dbt (e.g. `pip install dbt-snowflake`), create `~/.dbt/profiles.yml` with profile `game_analytics` pointing at your Snowflake database and schema, and run `dbt deps`.
+- [ ] **0.1** **Snowflake account setup** — follow [Snowflake account setup](instructions/snowflake-account-setup.md).
+- [ ] **0.2** **Pre-launch setup** — create database and schemas; see [Pre-launch setup](instructions/pre-launch-setup.md).
+- [ ] **0.3** **Snowflake credentials** — see [Snowflake credentials](instructions/snowflake-credentials.md) for how to find your account identifier, user, warehouse, database, and schema.
+- [ ] **0.4** **Run the platform** — from the repo root run `chmod +x run_platform.sh` (first time only), then `./run_platform.sh` to generate synthetic data and load `RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS` into Snowflake.
+- [ ] **0.5** **Set up dbt** — follow [dbt setup](instructions/dbt-setup.md): create your dbt project, `~/.dbt/profiles.yml` (profile `game_analytics` or as in the doc), and run `dbt deps`.
 
 <details>
-<summary>Answer — Phase 0</summary>
+<summary>Check yourself (Phase 0)</summary>
 
-*(No code — follow the steps above. You can add notes or links here later.)*
+Verify each of the following:
+
+1. **Snowflake account access** — You can log in and see your account (e.g. trial credits, ACCOUNTADMIN role).  
+   ![Snowflake account access](images/check-yourself-0/account.png)
+
+2. **Database, schemas, and tables in the catalog** — In Snowflake’s Database Explorer (Horizon Catalog), the `GAME_ANALYTICS` database and its schemas are visible; under the `RAW` schema you see the three tables: `RAW_GAME_EVENTS`, `RAW_PLAYERS`, `RAW_SESSIONS`.  
+   ![Database Explorer — GAME_ANALYTICS / RAW tables](images/check-yourself-0/db-schema-tables.png)
+
+3. **Separate dbt folder at repo root** — Your repo root contains a dedicated folder for the dbt project (e.g. `dbt-project`), not mixed with the game-data-platform app.  
+   ![Root folder with separate dbt-project](images/check-yourself-0/root-folder.png)
+
+4. **Virtual environment in the dbt folder** — Inside that dbt project folder (e.g. `dbt-project`) there is a `venv` (or similar) directory for the Python/dbt environment.
+
+5. **dbt debug passes** — From your dbt project directory, run `dbt debug`. The output shows all checks passed (connection, profile, and project config).  
+   ![dbt debug — all checks passed](images/check-yourself-0/dbt-debug.png)
 
 </details>
 
 #### Why this phase matters
 
-- You set up the runtime pieces (virtualenv, Snowflake credentials, dbt profile) so every other step can run consistently.
-- Having a dedicated `app/` and clear configs makes it easy for others to clone the repo and reproduce your warehouse.
-
-**Progress bar (after Phase 0 — setup done, 0/8 core phases):**
-
-| <span style="color:#22c55e"></span><span style="color:#9ca3af">################</span> | **0% (0/8 phases complete)** |
+- You set up Snowflake, load raw data, and configure dbt so every other phase can run consistently.
+- Following the instruction docs in order makes it easy to reproduce the warehouse.
 
 ---
 
@@ -177,7 +135,7 @@ Do the tasks in order. Each task is a single, clear step from start to finish.
 - [ ] **1.2** In the same YAML, add column definitions for each source table (player_id, first_seen_at, country, language, difficulty_selected for players; session_id, player_id, session start/end, platform for sessions; event_id, event_time, player_id, event_name, platform, game_version, properties for events). Add source tests where useful: `unique` and `not_null` on primary keys, `accepted_values` on fields like difficulty or platform.
 
 <details>
-<summary>Answer — Phase 1 (sources)</summary>
+<summary>Check yourself (Phase 1 — sources)</summary>
 
 ```yaml
 version: 2
@@ -197,10 +155,6 @@ sources:
 - Defining sources with columns and tests turns your raw Snowflake tables into a documented contract for the rest of the project.
 - Catching issues (bad values, missing keys) at the source layer keeps downstream models simpler and failures easier to debug.
 
-**Progress bar (after Phase 1):**
-
-| <span style="color:#22c55e">##</span><span style="color:#9ca3af">##############</span> | **12.5% (1/8 phases complete)** |
-
 ---
 
 ### Phase 2: Staging layer
@@ -211,7 +165,7 @@ sources:
 - [ ] **2.4** For each staging model, add a schema YAML with model description, column descriptions, and tests: `unique` and `not_null` on primary keys (player_id, session_id, event_id), `not_null` on important fields; for `stg_sessions`, add a `relationships` test from `player_id` to `ref('stg_players')`.
 
 <details>
-<summary>Answer — Phase 2 (staging models)</summary>
+<summary>Check yourself (Phase 2 — staging models)</summary>
 
 ```sql
 -- stg_players.sql
@@ -241,10 +195,6 @@ select * from source  -- add event_at, lower(event_name), lower(platform)
 - Staging models clean and standardize the raw data so all downstream tables share the same names, types, and semantics.
 - This is where you remove one-off quirks from ingestion and give analytics engineers a stable, well-typed surface to build on.
 
-**Progress bar (after Phase 2):**
-
-| <span style="color:#22c55e">####</span><span style="color:#9ca3af">############</span> | **25% (2/8 phases complete)** | 
-
 ---
 
 ### Phase 3: Core marts
@@ -256,7 +206,7 @@ select * from source  -- add event_at, lower(event_name), lower(platform)
 - [ ] **3.3** Join players to the session aggregates (left join). In the final select output: all player attributes, the session aggregate columns (use `coalesce(..., 0)` for counts and playtime so players with no sessions get 0), plus **days_since_first_seen** (days from `first_seen_at` to current date) and **days_since_last_session** (days from `last_session_at` to current date; null if no sessions). One row per player.
 
 <details>
-<summary>Answer — dim_players (3.1–3.3)</summary>
+<summary>Check yourself — dim_players (3.1–3.3)</summary>
 
 ```sql
 {{ config(materialized='table') }}
@@ -285,7 +235,7 @@ select * from final
 - [ ] **3.7** Join sessions to the event aggregates (left join). In the final select: all session and player columns, the event aggregate columns (use `coalesce(..., 0)` for counts), and **events_per_minute** = total_events / session_duration_minutes (0 if duration is 0). One row per session.
 
 <details>
-<summary>Answer — fct_sessions (3.4–3.7)</summary>
+<summary>Check yourself — fct_sessions (3.4–3.7)</summary>
 
 ```sql
 {{ config(materialized='table') }}
@@ -305,7 +255,7 @@ select * from final
 - [ ] **3.10** Join events to **stg_players** to add `country_code`, `language_code`, `difficulty_selected`. In the final select add **seconds_since_session_start** = seconds from `session_start_at` to `event_at` (null when session_id is null). One row per event.
 
 <details>
-<summary>Answer — fct_game_events (3.8–3.10)</summary>
+<summary>Check yourself — fct_game_events (3.8–3.10)</summary>
 
 ```sql
 {{ config(materialized='table') }}
@@ -322,7 +272,7 @@ select * from final
 - [ ] **3.11** Add schema YAML for `dim_players`, `fct_sessions`, and `fct_game_events`: column descriptions and tests. Include `unique` + `not_null` on primary keys, `relationships`: `fct_sessions.player_id` → `dim_players.player_id`, `fct_game_events.session_id` → `fct_sessions.session_id`.
 
 <details>
-<summary>Answer — Core marts schema (3.11)</summary>
+<summary>Check yourself — Core marts schema (3.11)</summary>
 
 ```yaml
 # dim_players.yml / fct_sessions.yml / fct_game_events.yml
@@ -341,10 +291,6 @@ models:
 - Core marts (dimensions and facts) are the main interface between raw data and analytics: almost every metric is built on them.
 - Getting join keys, grain, and aggregations right here prevents subtle bugs in every dashboard and analysis that follows.
 
-**Progress bar (after Phase 3):**
-
-| <span style="color:#22c55e">######</span><span style="color:#9ca3af">##########</span> | **37.5% (3/8 phases complete)** |
-
 ### Phase 4: Analytics marts
 
 **daily_active_players**
@@ -353,7 +299,7 @@ models:
 - [ ] **4.2** In **daily_active_players**, aggregate by (session_date, platform, country_code, difficulty_selected). Output: `session_date`, `platform`, `country_code`, `difficulty_selected`, `active_players` (count distinct player_id), `total_sessions`, `total_playtime_minutes`, `avg_sessions_per_player`, `avg_playtime_minutes_per_player`. Order by session_date desc, platform, country_code, difficulty_selected.
 
 <details>
-<summary>Answer — daily_active_players (4.1–4.2)</summary>
+<summary>Check yourself — daily_active_players (4.1–4.2)</summary>
 
 ```sql
 {{ config(materialized='table') }}
@@ -371,7 +317,7 @@ select * from final order by session_date desc, platform, country_code, difficul
 - [ ] **4.4** In **funnel_sessions**, aggregate by (session_date, platform, country_code, difficulty_selected). Output: total_sessions, sessions_with_game_started, sessions_with_chapter_started, sessions_with_checkpoint_reached, sessions_with_chapter_completed, sessions_with_game_closed; conversion rates as percentage of total_sessions (e.g. game_started_rate_pct); avg_chapters_started, avg_checkpoints_reached, avg_chapters_completed, avg_session_duration_minutes. Order by session_date desc, platform, country_code, difficulty_selected.
 
 <details>
-<summary>Answer — funnel_sessions (4.3–4.4)</summary>
+<summary>Check yourself — funnel_sessions (4.3–4.4)</summary>
 
 ```sql
 {{ config(materialized='table') }}
@@ -391,7 +337,7 @@ select * from final order by ...
 - [ ] **4.7** Add schema YAML for the three analytics models: descriptions and, where useful, tests (e.g. not_null on key dimensions, non-negative numeric columns).
 
 <details>
-<summary>Answer — retention (4.5–4.6) + analytics schema (4.7)</summary>
+<summary>Check yourself — retention (4.5–4.6) + analytics schema (4.7)</summary>
 
 ```sql
 -- retention.sql: cohorts from stg_players (cohort_date=date(first_seen_at)); join to session dates; aggregate by cohort_date, country_code, difficulty_selected, days_since_cohort; retention_rate_pct = active_players/cohort_size*100
@@ -410,17 +356,13 @@ with players as ( select player_id, country_code, difficulty_selected, date(firs
 - Analytics marts (DAU, funnel, retention) translate raw behavioral data into the KPIs your team actually discusses.
 - By keeping these as dbt models, you can iterate on definitions (e.g. what counts as active) with version control and tests instead of ad hoc SQL.
 
-**Progress bar (after Phase 4):**
-
-| <span style="color:#22c55e">########</span><span style="color:#9ca3af">########</span> | **50% (4/8 phases complete)** |
-
 ### Phase 5: Macros and project config
 
 - [ ] **5.1** Add macro **generate_schema_name(custom_schema_name, node)** so that when `custom_schema_name` is set it is used, otherwise use `target.schema`. (This lets staging and marts build into different schemas when you set `+schema` in dbt_project.)
 - [ ] **5.2** In `dbt_project.yml`, under `models.game_analytics`, define **staging** with `+materialized: view` and `+schema: staging`, and **marts** with `+materialized: table` and `+schema: marts`.
 
 <details>
-<summary>Answer — Phase 5 (macro + dbt_project)</summary>
+<summary>Check yourself (Phase 5 — macro + dbt_project)</summary>
 
 ```sql
 -- macros/generate_schema_name.sql
@@ -447,10 +389,6 @@ models:
 - Centralizing environment settings (schemas, materializations) keeps dev, CI, and prod aligned without copying SQL.
 - Small macros like `generate_schema_name` make it easy to add more environments later without rewriting models.
 
-**Progress bar (after Phase 5):**
-
-| <span style="color:#22c55e">##########</span><span style="color:#9ca3af">######</span> | **62.5% (5/8 phases complete)** |
-
 ### Phase 6: Tests and quality
 
 - [ ] **6.1** In schema YAMLs, ensure primary key columns have `unique` and `not_null`; foreign keys have `relationships` to the referenced model. Add `not_null` (or accepted_values) on other critical columns.
@@ -458,7 +396,7 @@ models:
 - [ ] **6.3** Run `dbt build` locally and fix any failing models or tests until everything passes.
 
 <details>
-<summary>Answer — Phase 6 (tests)</summary>
+<summary>Check yourself (Phase 6 — tests)</summary>
 
 ```sql
 -- tests/sessions_no_overlap.sql: return rows where same player has two sessions with overlapping [start,end]
@@ -478,16 +416,12 @@ tests:
 - Tests turn your warehouse into something you can trust: they catch broken assumptions as soon as data or code changes.
 - Encoding business rules (like no overlapping sessions) in tests prevents silent data drift that would invalidate product decisions.
 
-**Progress bar (after Phase 6):**
-
-| <span style="color:#22c55e">############</span><span style="color:#9ca3af">####</span> | **75% (6/8 phases complete)** |
-
 ### Phase 7: CI
 
 - [ ] **7.1** Add a GitHub Actions workflow (e.g. `.github/workflows/dbt.yml`) that on push/PR to `main`: checks out repo, sets up Python, installs dbt-snowflake, runs `dbt deps`, loads Snowflake profile from a secret (e.g. `SNOWFLAKE_CI_PROFILE`), runs `dbt compile --target ci`, and runs `dbt build --target ci`. Ensure the CI target in the profile uses a dedicated schema so broken contracts or failing tests block the merge.
 
 <details>
-<summary>Answer — Phase 7 (CI)</summary>
+<summary>Check yourself (Phase 7 — CI)</summary>
 
 ```yaml
 # .github/workflows/dbt.yml
@@ -514,10 +448,6 @@ jobs:
 - CI ensures every change to models or tests is exercised automatically before it reaches main.
 - When CI fails on bad data or broken contracts, you find issues in pull requests instead of in production dashboards.
 
-**Progress bar (after Phase 7):**
-
-| <span style="color:#22c55e">##############</span><span style="color:#9ca3af">##</span> | **87.5% (7/8 phases complete)** |
-
 ---
 
 ### Phase 8 (Advanced): Incremental `fct_game_events`
@@ -527,7 +457,7 @@ jobs:
 - [ ] **8.3** Run a full-refresh and an incremental run, compare row counts and tests, and make sure incremental behavior matches the full build.
 
 <details>
-<summary>Answer — Phase 8 (incremental fct_game_events)</summary>
+<summary>Check yourself (Phase 8 — incremental fct_game_events)</summary>
 
 ```sql
 {{ config(
@@ -561,11 +491,8 @@ with events as (
 - Real production warehouses rarely rebuild large event tables from scratch — **incremental models** keep compute + cost under control.
 - Designing a correct incremental filter (grain, unique key, late-arriving data) forces you to think carefully about **time, idempotency, and data correctness**.
 
-**Progress bar (after Phase 8):**
 
-| <span style="color:#22c55e">################</span><span style="color:#9ca3af"></span> | **100% (8/8 phases complete)** |
-
-Congratulations — you’ve completed all 8 core phases. The bar is fully green; the bonus *Final Boss* below is represented by a golden segment.
+Congratulations — you’ve completed all 8 core phases. The *Final Boss* section below is the bonus challenge.
 
 ---
 
@@ -586,12 +513,6 @@ After completing all phases (sources → staging → marts → tests → CI), yo
 
 If you can answer these — your warehouse is working.
 
-**Bonus progress (Final Boss questions):**
-
-| <span style="color:#22c55e">################</span><span style="color:#eab308">####</span> | **Core 100% + Final Boss bonus** |
-
-Green represents the 8 core phases; the golden segment corresponds to answering all of the questions in this section.
-
 ### 1. Retention & Player Return
 
 1. What are **D1, D3, and D7 retention rates**?
@@ -603,7 +524,7 @@ Green represents the 8 core phases; the golden segment corresponds to answering 
 Goal: understand whether players come back — and who does not.
 
 <details>
-<summary>Answers — 1. Retention & Player Return</summary>
+<summary>Check yourself — 1. Retention & Player Return</summary>
 
 - **Q1 – D1/D3/D7 retention**: use the `retention` model; filter `days_since_cohort IN (1, 3, 7)` and read `retention_rate_pct` for those days (optionally averaging across cohorts).
 - **Q2 – Countries with lowest retention**: from `retention`, group by `country_code` and a chosen `days_since_cohort` (e.g. 1 or 7), order by `retention_rate_pct` ascending.
@@ -623,7 +544,7 @@ Goal: understand whether players come back — and who does not.
 Goal: identify friction points in the core loop.
 
 <details>
-<summary>Answers — 2. Drop-Off & Friction</summary>
+<summary>Check yourself — 2. Drop-Off & Friction</summary>
 
 - **Q6 – Funnel step with biggest drop**: use `funnel_sessions`; compare `sessions_with_*` columns vs `total_sessions` for each step to see where conversion rate is lowest.
 - **Q7 – % of sessions without a checkpoint**: in `funnel_sessions`, compute `1 - sessions_with_checkpoint_reached / total_sessions` for your chosen date range.
@@ -642,7 +563,7 @@ Goal: identify friction points in the core loop.
 Goal: detect balance issues before ship.
 
 <details>
-<summary>Answers — 3. Difficulty & Balance</summary>
+<summary>Check yourself — 3. Difficulty & Balance</summary>
 
 - **Q10 – Difficulty with highest death rate per session**: from `fct_sessions`, group by `difficulty_selected` and compute `sum(deaths_count) / count(*)` (or average `deaths_count`).
 - **Q11 – Do higher difficulties churn faster?**: from `retention`, group by `difficulty_selected` and `days_since_cohort` (e.g. day 1 / 7) and compare `retention_rate_pct` across difficulties.
@@ -661,7 +582,7 @@ Goal: detect balance issues before ship.
 Goal: understand how players actually play.
 
 <details>
-<summary>Answers — 4. Session Behavior</summary>
+<summary>Check yourself — 4. Session Behavior</summary>
 
 - **Q14 – Median session duration**: read `median(session_duration_minutes)` (or approximate with `percentile_cont(0.5)`) from `fct_sessions`.
 - **Q15 – Longer sessions vs retention**: aggregate `fct_sessions` to player level (e.g. average `session_duration_minutes` per player), join to `retention` or cohort info, and compare retention metrics across duration buckets.
@@ -686,10 +607,12 @@ Goal: understand how players actually play.
 Goal: separate your engaged audience from early churn.
 
 <details>
-<summary>Answers — 5. Segmentation</summary>
+<summary>Check yourself — 5. Segmentation</summary>
 
 - **Q18 – Core players**: in `dim_players`, define a core player as `total_sessions >= 5`, `total_playtime_minutes >= 120`, and `chapters_completed >= 1` (if you add that metric); count them and slice by `country_code` and `difficulty_selected`.
 - **Q19 – One-and-done players**: from `dim_players`, filter `total_sessions = 1` and (optionally) zero progression; compute their share of all players and break down by country and difficulty to see where early churn concentrates.
+
+</details>
 
 ### Completion Criteria
 
@@ -702,15 +625,3 @@ You have successfully completed the project if:
 - You can identify at least one actionable product insight.
 
 At that point, you are no longer "building tables." You are running a game analytics platform.
-
----
-
-## Repos at a Glance
-
-| Path | Purpose |
-|------|--------|
-| **This folder** (`game-data-platform/`) | Story and task list (this README). Run `./run_platform.sh` or `python app/main.py` from here to generate and load data. Pipeline details in [app/README.md](app/README.md). |
-| `app/` | Pipeline code: gen, ingest, main. See [app/README.md](app/README.md). |
-| **Your dbt project** | You create it. See [dbt setup](instructions/dbt-setup.md). Then build sources → staging → marts; run `dbt build` after data is loaded. |
-
-Start with the platform to get data; then set up dbt and work through the tasks in order. When you’re done, you’ll have a full story: from “raw events in Snowflake” to “tables ready for DAU, funnel, and retention.”
