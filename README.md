@@ -121,12 +121,6 @@ Verify each of the following:
    ![dbt debug — all checks passed](images/check-yourself-0/dbt-debug.png)
 
 </details>
-
-#### Why this phase matters
-
-- You set up Snowflake, load raw data, and configure dbt so every other phase can run consistently.
-- Following the instruction docs in order makes it easy to reproduce the warehouse.
-
 ---
 
 ### Phase 1: Raw layer (sources)
