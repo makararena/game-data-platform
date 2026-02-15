@@ -96,7 +96,7 @@ Do the tasks in order. Each task is a single, clear step from start to finish.
 ### Phase 0: Get data and set up dbt
 
 - [ ] **0.1** **Snowflake account setup** — follow [Snowflake account setup](instructions/snowflake-account-setup.md).
-- [ ] **0.2** **Pre-launch setup** — create database and schemas; see [Pre-launch setup](instructions/pre-launch-setup.md).
+- [ ] **0.2** **Pre-launch setup** — create database and schemas in Snowflake. See [Pre-launch setup](instructions/pre-launch-setup.md): choose **Path 1** (minimal: database + schemas only) or **Path 2** (production-style: warehouse + database + role + schemas, including `ALTER USER ... SET DEFAULT_ROLE = DBT_ROLE`).
 - [ ] **0.3** **Snowflake credentials** — see [Snowflake credentials](instructions/snowflake-credentials.md) for how to find your account identifier, user, warehouse, database, and schema.
 - [ ] **0.4** **Run the platform** — from the repo root run `chmod +x run_platform.sh` (first time only), then `./run_platform.sh` to generate synthetic data and load `RAW_PLAYERS`, `RAW_SESSIONS`, `RAW_GAME_EVENTS` into Snowflake.
 - [ ] **0.5** **Set up dbt** — follow [dbt setup](instructions/dbt-setup.md): create your dbt project, `~/.dbt/profiles.yml` (profile `game_analytics` or as in the doc), and run `dbt deps`.
@@ -112,12 +112,20 @@ Verify each of the following:
 2. **Database, schemas, and tables in the catalog** — In Snowflake’s Database Explorer (Horizon Catalog), the `GAME_ANALYTICS` database and its schemas are visible; under the `RAW` schema you see the three tables: `RAW_GAME_EVENTS`, `RAW_PLAYERS`, `RAW_SESSIONS`.  
    ![Database Explorer — GAME_ANALYTICS / RAW tables](images/check-yourself-0/db-schema-tables.png)
 
-3. **Separate dbt folder at repo root** — Your repo root contains a dedicated folder for the dbt project (e.g. `dbt-project`), not mixed with the game-data-platform app.  
+3. **Data preview** — In Snowflake's Database Explorer, open each raw table and go to the **Data Preview** tab. You should see sample rows in each table. Use this to confirm data was loaded correctly. Reference screenshots:
+   - **RAW_PLAYERS** (e.g. ~2K rows: player_id, first_seen_at, country, language, difficulty_selected)  
+     ![RAW_PLAYERS data preview](images/check-yourself-0/raw_players.png)
+   - **RAW_SESSIONS** (e.g. ~6K rows: session_id, player_id, session_start, session_end, platform)  
+     ![RAW_SESSIONS data preview](images/check-yourself-0/raw_sessions.png)
+   - **RAW_GAME_EVENTS** (e.g. ~231K rows: event_id, event_time, player_id, event_name, platform)  
+     ![RAW_GAME_EVENTS data preview](images/check-yourself-0/raw_game_events.png)
+
+4. **Separate dbt folder at repo root** — Your repo root contains a dedicated folder for the dbt project (e.g. `dbt-project`), not mixed with the game-data-platform app.  
    ![Root folder with separate dbt-project](images/check-yourself-0/root-folder.png)
 
-4. **Virtual environment in the dbt folder** — Inside that dbt project folder (e.g. `dbt-project`) there is a `venv` (or similar) directory for the Python/dbt environment.
+5. **Virtual environment in the dbt folder** — Inside that dbt project folder (e.g. `dbt-project`) there is a `venv` (or similar) directory for the Python/dbt environment.
 
-5. **dbt debug passes** — From your dbt project directory, run `dbt debug`. The output shows all checks passed (connection, profile, and project config).  
+6. **dbt debug passes** — From your dbt project directory, run `dbt debug`. The output shows all checks passed (connection, profile, and project config).  
    ![dbt debug — all checks passed](images/check-yourself-0/dbt-debug.png)
 
 </details>
