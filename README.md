@@ -592,7 +592,7 @@ If you can answer these — your warehouse is working.
 
 Green represents the 8 core phases; the golden segment corresponds to answering all of the questions in this section.
 
-### 🎮 1. Retention & Player Return
+### 1. Retention & Player Return
 
 1. What are **D1, D3, and D7 retention rates**?
 2. Which **countries** have the lowest retention?
@@ -613,7 +613,7 @@ Goal: understand whether players come back — and who does not.
 
 </details>
 
-### 💀 2. Drop-Off & Friction
+### 2. Drop-Off & Friction
 
 6. At which step of the session funnel do players drop the most?
 7. What % of sessions never reach a **checkpoint**?
@@ -632,7 +632,7 @@ Goal: identify friction points in the core loop.
 
 </details>
 
-### ⚔️ 3. Difficulty & Balance
+### 3. Difficulty & Balance
 
 10. Which difficulty has the highest **death rate per session**?
 11. Do players on higher difficulty churn faster?
@@ -651,7 +651,7 @@ Goal: detect balance issues before ship.
 
 </details>
 
-### ⏱ 4. Session Behavior
+### 4. Session Behavior
 
 14. What is the **median session duration**?
 15. Are longer sessions correlated with higher retention?
@@ -670,7 +670,7 @@ Goal: understand how players actually play.
 
 </details>
 
-### 🌍 5. Segmentation
+### 5. Segmentation
 
 18. Define a "core player" (e.g. ≥5 sessions, ≥120 minutes playtime, ≥1 chapter completed).
 
@@ -691,45 +691,7 @@ Goal: separate your engaged audience from early churn.
 - **Q18 – Core players**: in `dim_players`, define a core player as `total_sessions >= 5`, `total_playtime_minutes >= 120`, and `chapters_completed >= 1` (if you add that metric); count them and slice by `country_code` and `difficulty_selected`.
 - **Q19 – One-and-done players**: from `dim_players`, filter `total_sessions = 1` and (optionally) zero progression; compute their share of all players and break down by country and difficulty to see where early churn concentrates.
 
-</details>
-
-### 📉 6. Data Quality & Edge Cases
-
-20. Are there **events outside session windows**?
-21. Are there overlapping sessions for the same player?
-22. Are there sessions with negative or zero duration?
-23. Are any core foreign key relationships broken?
-
-Goal: validate the integrity of your warehouse.
-
-<details>
-<summary>Answers — 6. Data Quality & Edge Cases</summary>
-
-- **Q20 – Events outside session windows**: in `fct_game_events`, filter where `session_id IS NULL` to find events that didn’t match any session window.
-- **Q21 – Overlapping sessions**: inspect the output of the `sessions_no_overlap` singular test (or re-run its SQL) to list players with overlapping `session_start`/`session_end` ranges.
-- **Q22 – Sessions with negative or zero duration**: in `fct_sessions` (or `stg_sessions`), filter `session_duration_minutes <= 0` and investigate their raw timestamps.
-- **Q23 – Broken foreign keys**: rely on dbt `relationships` tests (e.g. `fct_sessions.player_id` → `dim_players.player_id`); for manual checks, left join facts to dims and look for rows where the dim side is null.
-
-</details>
-
-### 🚀 7. Strategic Thinking
-
-24. If D1 retention improved by 5%, how would that affect DAU over 30 days?
-25. If one chapter's completion rate increased by 10%, what downstream metrics would likely change?
-26. If you could monitor only **one metric before launch**, what would it be — and why?
-
-Goal: move from reporting to decision-making.
-
-<details>
-<summary>Answers — 7. Strategic Thinking</summary>
-
-- **Q24 – D1 +5% impact on DAU**: use `daily_active_players` or aggregated `fct_sessions` to simulate higher day‑1 retention in cohorts and project its effect on daily active counts over 30 days (e.g. by adjusting retention curves).
-- **Q25 – Chapter completion +10%**: from your chapter completion analysis (Q12), reason about which downstream metrics would move (e.g. more sessions reaching later chapters, higher total playtime, higher retention for affected cohorts).
-- **Q26 – Single pre‑launch metric**: your answer should be justified using the models above (e.g. D1 retention from `retention`, or chapters completed from `fct_game_events`), and argue why that metric best reflects long‑term success for this game.
-
-</details>
-
-### 🏆 Completion Criteria
+### Completion Criteria
 
 You have successfully completed the project if:
 
