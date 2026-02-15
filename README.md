@@ -121,7 +121,6 @@ Verify each of the following:
    ![dbt debug — all checks passed](images/check-yourself-0/dbt-debug.png)
 
 </details>
----
 
 ### Phase 1: Raw layer (sources)
 
