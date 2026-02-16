@@ -348,4 +348,4 @@ dbt test --select daily_active_players funnel_sessions retention
 
 ---
 
-Then proceed to [Phase 6: Macros and project config](../../../README.md#phase-6-macros-and-project-config).
+Then proceed to [Phase 6: Tests and quality](../phase6/phase6-tests-quality.md).

@@ -188,69 +188,19 @@ Verify each of the following:
 
 ---
 
-### Phase 6: Macros and project config
+### Phase 6: Tests and quality
 
-- [ ] **6.1** Add macro **generate_schema_name(custom_schema_name, node)** so that when `custom_schema_name` is set it is used, otherwise use `target.schema`. (Phase 2 already covers this; use this task if you add more layers, e.g. marts schema.)
-- [ ] **6.2** In `dbt_project.yml`, under `models.game_analytics`, define **staging** with `+materialized: view` and `+schema: staging`, and **marts** with `+materialized: table` and `+schema: marts`.
+**Instructions:** [Phase 6 — Task](instructions/phases/phase6/phase6-tests-quality.md) · [Phase 6 — Check yourself](instructions/phases/phase6/phase6-tests-quality-check-yourself.md)
 
-<details>
-<summary>Check yourself (Phase 5 — macro + dbt_project)</summary>
+- [ ] **6.1** In schema YAMLs, ensure primary key columns have `unique` and `not_null`; foreign keys have `relationships` to the referenced model. Add `not_null` (or accepted_values) on other critical columns.
+- [ ] **6.2** Add a **singular test** (e.g. `tests/sessions_no_overlap.sql`) that returns rows where the same player has two sessions with overlapping [session_start_at, session_end_at]. The test should fail if any such rows exist. Register it in `tests/schema.yml` and run `dbt test`.
+- [ ] **6.3** Run `dbt build` locally and fix any failing models or tests until everything passes.
 
-```sql
--- macros/generate_schema_name.sql
-{% macro generate_schema_name(custom_schema_name, node) -%}
-    {{ custom_schema_name if custom_schema_name is not none else target.schema }}
-{%- endmacro %}
-```
-```yaml
-# dbt_project.yml
-models:
-  game_analytics:
-    staging:
-      +materialized: view
-      +schema: staging
-    marts:
-      +materialized: table
-      +schema: marts
-```
+---
 
-</details>
+### Phase 7: CI
 
-#### Why this phase matters
-
-- Centralizing environment settings (schemas, materializations) keeps dev, CI, and prod aligned without copying SQL.
-- Small macros like `generate_schema_name` make it easy to add more environments later without rewriting models.
-
-### Phase 7: Tests and quality
-
-- [ ] **7.1** In schema YAMLs, ensure primary key columns have `unique` and `not_null`; foreign keys have `relationships` to the referenced model. Add `not_null` (or accepted_values) on other critical columns.
-- [ ] **7.2** Add a **singular test** (e.g. `tests/sessions_no_overlap.sql`) that returns rows where the same player has two sessions with overlapping [session_start_at, session_end_at]. The test should fail if any such rows exist. Register it in `tests/schema.yml` and run `dbt test`.
-- [ ] **7.3** Run `dbt build` locally and fix any failing models or tests until everything passes.
-
-<details>
-<summary>Check yourself (Phase 6 — tests)</summary>
-
-```sql
--- tests/sessions_no_overlap.sql: return rows where same player has two sessions with overlapping [start,end]
-select * from ( ... s1 join s2 on player_id and s1.session_start < s2.session_end and s1.session_end > s2.session_start )
-```
-```yaml
-# tests/schema.yml
-tests:
-  - name: sessions_no_overlap
-    config: { severity: error, store_failures: true }
-```
-
-</details>
-
-#### Why this phase matters
-
-- Tests turn your warehouse into something you can trust: they catch broken assumptions as soon as data or code changes.
-- Encoding business rules (like no overlapping sessions) in tests prevents silent data drift that would invalidate product decisions.
-
-### Phase 8: CI
-
-- [ ] **8.1** Add a GitHub Actions workflow (e.g. `.github/workflows/dbt.yml`) that on push/PR to `main`: checks out repo, sets up Python, installs dbt-snowflake, runs `dbt deps`, loads Snowflake profile from a secret (e.g. `SNOWFLAKE_CI_PROFILE`), runs `dbt compile --target ci`, and runs `dbt build --target ci`. Ensure the CI target in the profile uses a dedicated schema so broken contracts or failing tests block the merge.
+- [ ] **7.1** Add a GitHub Actions workflow (e.g. `.github/workflows/dbt.yml`) that on push/PR to `main`: checks out repo, sets up Python, installs dbt-snowflake, runs `dbt deps`, loads Snowflake profile from a secret (e.g. `SNOWFLAKE_CI_PROFILE`), runs `dbt compile --target ci`, and runs `dbt build --target ci`. Ensure the CI target in the profile uses a dedicated schema so broken contracts or failing tests block the merge.
 
 <details>
 <summary>Check yourself (Phase 7 — CI)</summary>
@@ -282,14 +232,14 @@ jobs:
 
 ---
 
-### Phase 9 (Advanced): Incremental `fct_game_events`
+### Phase 8 (Advanced): Incremental `fct_game_events`
 
-- [ ] **9.1** Update `fct_game_events` to use `materialized='incremental'` with a stable `unique_key` (e.g. `event_id`) and a sensible `on_schema_change` strategy.
-- [ ] **9.2** Implement an incremental filter with `is_incremental()` so that incremental runs only process **new** events (e.g. `event_at > max(event_at) in {{ this }}`).
-- [ ] **9.3** Run a full-refresh and an incremental run, compare row counts and tests, and make sure incremental behavior matches the full build.
+- [ ] **8.1** Update `fct_game_events` to use `materialized='incremental'` with a stable `unique_key` (e.g. `event_id`) and a sensible `on_schema_change` strategy.
+- [ ] **8.2** Implement an incremental filter with `is_incremental()` so that incremental runs only process **new** events (e.g. `event_at > max(event_at) in {{ this }}`).
+- [ ] **8.3** Run a full-refresh and an incremental run, compare row counts and tests, and make sure incremental behavior matches the full build.
 
 <details>
-<summary>Check yourself (Phase 9 — incremental fct_game_events)</summary>
+<summary>Check yourself (Phase 8 — incremental fct_game_events)</summary>
 
 ```sql
 {{ config(

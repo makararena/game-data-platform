@@ -87,4 +87,4 @@ dbt test --select daily_active_players funnel_sessions retention
 
 ---
 
-**When you're done,** see [Phase 5 — Check yourself](phase5-analytics-marts-check-yourself.md) for a full solution. Then proceed to [Phase 6: Macros and project config](../../../README.md#phase-6-macros-and-project-config).
+**When you're done,** see [Phase 5 — Check yourself](phase5-analytics-marts-check-yourself.md) for a full solution. Then proceed to [Phase 6: Tests and quality](../phase6/phase6-tests-quality.md).
