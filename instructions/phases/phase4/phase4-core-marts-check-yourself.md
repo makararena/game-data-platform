@@ -341,3 +341,7 @@ dbt test --select dim_players fct_sessions fct_game_events
 ## Note on fct_game_events
 
 The `relationships` test on `session_id` may fail if `session_id` can be null (events outside any session). The `relationships` test in dbt typically skips nulls by default. If your dbt version requires it, you can make the relationship test conditional or exclude the test for null session_id. Check your dbt docs for `relationships` behavior with nulls.
+
+---
+
+Then proceed to [Phase 5: Analytics marts](../phase5/phase5-analytics-marts.md).

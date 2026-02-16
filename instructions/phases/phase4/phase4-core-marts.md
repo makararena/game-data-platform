@@ -115,4 +115,4 @@ dbt test --select dim_players fct_sessions fct_game_events
 
 ---
 
-**When you're done,** see [Phase 4 — Check yourself](phase4-core-marts-check-yourself.md) for a full solution. Then proceed to [Phase 5: Analytics marts](../../../README.md#phase-5-analytics-marts).
+**When you're done,** see [Phase 4 — Check yourself](phase4-core-marts-check-yourself.md) for a full solution. Then proceed to [Phase 5: Analytics marts](../phase5/phase5-analytics-marts.md).

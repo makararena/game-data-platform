@@ -176,68 +176,17 @@ Verify each of the following:
 
 ### Phase 5: Analytics marts
 
-**daily_active_players**
+**Instructions:** [Phase 5 — Task](instructions/phases/phase5/phase5-analytics-marts.md) · [Phase 5 — Check yourself](instructions/phases/phase5/phase5-analytics-marts-check-yourself.md)
 
 - [ ] **5.1** Create **daily_active_players** as a materialized table. From **stg_sessions**, compute per (player_id, session_date, platform): session date, platform, sessions_count (count distinct session_id), total_playtime_minutes (sum duration). Join to **stg_players** for `country_code`, `difficulty_selected`.
 - [ ] **5.2** In **daily_active_players**, aggregate by (session_date, platform, country_code, difficulty_selected). Output: `session_date`, `platform`, `country_code`, `difficulty_selected`, `active_players` (count distinct player_id), `total_sessions`, `total_playtime_minutes`, `avg_sessions_per_player`, `avg_playtime_minutes_per_player`. Order by session_date desc, platform, country_code, difficulty_selected.
-
-<details>
-<summary>Check yourself — daily_active_players (4.1–4.2)</summary>
-
-```sql
-{{ config(materialized='table') }}
-with sessions as ( select player_id, platform, date(session_start_at) as session_date, count(*) as sessions_count, sum(session_duration_minutes) as total_playtime_minutes from {{ ref('stg_sessions') }} group by 1,2,3 ),
-players as ( select player_id, country_code, difficulty_selected from {{ ref('stg_players') }} ),
-final as ( select s.session_date, s.platform, p.country_code, p.difficulty_selected, count(distinct s.player_id) as active_players, sum(s.sessions_count) as total_sessions, ... from sessions s left join players p ... group by ... )
-select * from final order by session_date desc, platform, country_code, difficulty_selected
-```
-
-</details>
-
-**funnel_sessions**
-
 - [ ] **5.3** Create **funnel_sessions** as a materialized table. Match **stg_game_events** to **stg_sessions** by player_id and event time within session window. Per session compute flags: has_game_started, has_chapter_started, has_checkpoint_reached, has_chapter_completed, has_game_closed (1 if any such event, else 0), and counts: game_started_count, chapters_started_count, checkpoints_reached_count, chapters_completed_count. Join to **stg_players** for country_code, difficulty_selected.
 - [ ] **5.4** In **funnel_sessions**, aggregate by (session_date, platform, country_code, difficulty_selected). Output: total_sessions, sessions_with_game_started, sessions_with_chapter_started, sessions_with_checkpoint_reached, sessions_with_chapter_completed, sessions_with_game_closed; conversion rates as percentage of total_sessions (e.g. game_started_rate_pct); avg_chapters_started, avg_checkpoints_reached, avg_chapters_completed, avg_session_duration_minutes. Order by session_date desc, platform, country_code, difficulty_selected.
-
-<details>
-<summary>Check yourself — funnel_sessions (4.3–4.4)</summary>
-
-```sql
-{{ config(materialized='table') }}
-with sessions as ( select ... from {{ ref('stg_sessions') }} ),
-events as ( select player_id, event_name, event_at from {{ ref('stg_game_events') }} ),
-session_events as ( /* join sessions + events by player_id and time window; max(case when event_name=...) as has_* */ ),
-final as ( select session_date, platform, country_code, difficulty_selected, count(*) as total_sessions, sum(has_game_started), ... from session_events ... )
-select * from final order by ...
-```
-
-</details>
-
-**retention**
-
 - [ ] **5.5** Create **retention** as a materialized table. Define cohorts from **stg_players**: cohort_date = date(first_seen_at), plus country_code, difficulty_selected. From **stg_sessions** take (player_id, session_date).
 - [ ] **5.6** In **retention**: join so each (player, cohort_date, session_date) has session_date >= cohort_date. Compute days_since_cohort = datediff(day, cohort_date, session_date). Aggregate by (cohort_date, country_code, difficulty_selected, days_since_cohort): active_players (count distinct player_id), cohort_size (same for all days in that cohort). Add retention_rate_pct = (active_players / cohort_size) * 100. Order by cohort_date desc, days_since_cohort, country_code, difficulty_selected.
 - [ ] **5.7** Add schema YAML for the three analytics models: descriptions and, where useful, tests (e.g. not_null on key dimensions, non-negative numeric columns).
 
-<details>
-<summary>Check yourself — retention (4.5–4.6) + analytics schema (4.7)</summary>
-
-```sql
--- retention.sql: cohorts from stg_players (cohort_date=date(first_seen_at)); join to session dates; aggregate by cohort_date, country_code, difficulty_selected, days_since_cohort; retention_rate_pct = active_players/cohort_size*100
-{{ config(materialized='table') }}
-with players as ( select player_id, country_code, difficulty_selected, date(first_seen_at) as cohort_date from {{ ref('stg_players') }} ),
-...
-```
-```yaml
-# analytics model .yml: not_null on session_date, platform, country_code, etc.
-```
-
-</details>
-
-#### Why this phase matters
-
-- Analytics marts (DAU, funnel, retention) translate raw behavioral data into the KPIs your team actually discusses.
-- By keeping these as dbt models, you can iterate on definitions (e.g. what counts as active) with version control and tests instead of ad hoc SQL.
+---
 
 ### Phase 6: Macros and project config
 
