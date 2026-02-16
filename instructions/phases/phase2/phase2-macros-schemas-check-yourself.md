@@ -13,12 +13,15 @@ Add (or merge) the following. Vars at top level; `staging` under your project’
 vars:
   raw_schema: 'RAW'
   staging_schema: 'STAGING'
+  marts_schema: 'MARTS'
 
 # Under models: → game_dbt_project: (or your project name)
 models:
   game_dbt_project:
     staging:
       +schema: staging
+    marts:
+      +schema: marts
 ```
 
 ---
@@ -33,6 +36,8 @@ Create the file with this content:
         {{ target.schema }}
     {%- elif custom_schema_name | trim | lower == 'staging' -%}
         {{ var('staging_schema', 'STAGING') }}
+    {%- elif custom_schema_name | trim | lower == 'marts' -%}
+        {{ var('marts_schema', 'MARTS') }}
     {%- else -%}
         {{ target.schema }}_{{ custom_schema_name | trim }}
     {%- endif -%}
@@ -66,4 +71,4 @@ So: **schema** is `"{{ var('raw_schema', 'RAW') }}"`, not `target.schema`.
 dbt parse
 ```
 
-Then proceed to Phase 3 to add staging models; `dbt run --select staging` will build them in the STAGING schema.
+Then proceed to Phase 3 to add staging models; `dbt run --select staging` will build them in the STAGING schema. Phase 4 marts will build in the MARTS schema.

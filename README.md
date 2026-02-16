@@ -137,10 +137,11 @@ Verify each of the following:
 
 **Instructions:** [Phase 2 — Task](instructions/phases/phase2/phase2-macros-schemas.md) · [Phase 2 — Check yourself](instructions/phases/phase2/phase2-macros-schemas-check-yourself.md)
 
-- [ ] **2.1** Add **vars** `raw_schema` and `staging_schema` in `dbt_project.yml`.
+- [ ] **2.1** Add **vars** `raw_schema`, `staging_schema`, and `marts_schema` in `dbt_project.yml`.
 - [ ] **2.2** Set each **source**’s `schema` to `"{{ var('raw_schema', 'RAW') }}"`.
-- [ ] **2.3** Create **`generate_schema_name`** macro so models with `+schema: staging` build in `var('staging_schema', 'STAGING')`.
+- [ ] **2.3** Create **`generate_schema_name`** macro so models with `+schema: staging` build in `var('staging_schema', 'STAGING')` and `+schema: marts` in `var('marts_schema', 'MARTS')`.
 - [ ] **2.4** Under `models`, set **staging** folder to `+schema: staging`.
+- [ ] **2.5** Under `models`, set **marts** folder to `+schema: marts`.
 
 ---
 
@@ -157,97 +158,21 @@ Verify each of the following:
 
 ### Phase 4: Core marts
 
-**dim_players**
+**Instructions:** [Phase 4 — Task](instructions/phases/phase4/phase4-core-marts.md) · [Phase 4 — Check yourself](instructions/phases/phase4/phase4-core-marts-check-yourself.md)
 
 - [ ] **4.1** Create model **dim_players** as a **materialized table**. Base: select all columns from `ref('stg_players')` (one row per player).
 - [ ] **4.2** Add a CTE that aggregates **stg_sessions** per player: `total_sessions` (count), `total_playtime_minutes` (sum of `session_duration_minutes`), `avg_session_duration_minutes`, `first_session_at` (min of `session_start_at`), `last_session_at` (max of `session_start_at`), `active_days` (count distinct date of `session_start_at`). Group by `player_id`.
 - [ ] **4.3** Join players to the session aggregates (left join). In the final select output: all player attributes, the session aggregate columns (use `coalesce(..., 0)` for counts and playtime so players with no sessions get 0), plus **days_since_first_seen** (days from `first_seen_at` to current date) and **days_since_last_session** (days from `last_session_at` to current date; null if no sessions). One row per player.
-
-<details>
-<summary>Check yourself — dim_players (4.1–4.3)</summary>
-
-```sql
-{{ config(materialized='table') }}
-with players as ( select * from {{ ref('stg_players') }} ),
-sessions_agg as (
-    select player_id, count(*) as total_sessions, sum(session_duration_minutes) as total_playtime_minutes,
-           min(session_start_at) as first_session_at, max(session_start_at) as last_session_at,
-           count(distinct date(session_start_at)) as active_days
-    from {{ ref('stg_sessions') }} group by player_id
-),
-final as (
-    select p.*, coalesce(s.total_sessions,0) as total_sessions, coalesce(s.total_playtime_minutes,0) as total_playtime_minutes,
-           coalesce(s.active_days,0) as active_days, datediff('day', p.first_seen_at, current_timestamp()) as days_since_first_seen
-    from players p left join sessions_agg s on p.player_id = s.player_id
-)
-select * from final
-```
-
-</details>
-
-**fct_sessions**
-
 - [ ] **4.4** Create model **fct_sessions** as a **materialized table**. Base: select all columns from `ref('stg_sessions')` (one row per session).
 - [ ] **4.5** Join each session to **stg_players** to add `country_code`, `language_code`, `difficulty_selected` to each session row.
 - [ ] **4.6** Match **stg_game_events** to sessions by `player_id` and event time within `session_start_at` and `session_end_at`. Aggregate per session: `total_events`, `unique_event_types` (count distinct event_name), `deaths_count` (count where event_name = 'player_died'), `enemies_killed` (event_name = 'enemy_killed'), `chapters_completed` (event_name = 'chapter_completed'), `first_event_at`, `last_event_at`.
 - [ ] **4.7** Join sessions to the event aggregates (left join). In the final select: all session and player columns, the event aggregate columns (use `coalesce(..., 0)` for counts), and **events_per_minute** = total_events / session_duration_minutes (0 if duration is 0). One row per session.
-
-<details>
-<summary>Check yourself — fct_sessions (4.4–4.7)</summary>
-
-```sql
-{{ config(materialized='table') }}
-with sessions as ( select * from {{ ref('stg_sessions') }} ),
-players as ( select player_id, country_code, language_code, difficulty_selected from {{ ref('stg_players') }} ),
-events_agg as ( /* match events to sessions by player_id + time window, then group by session_id */ ),
-final as ( select s.*, p.country_code, p.language_code, p.difficulty_selected, e.total_events, e.deaths_count, ... from sessions s left join players p ... left join events_agg e ... )
-select * from final
-```
-
-</details>
-
-**fct_game_events**
-
 - [ ] **4.8** Create model **fct_game_events** as a **materialized table**. Base: select from `ref('stg_game_events')` (one row per event).
 - [ ] **4.9** Match each event to a session: same `player_id` and `event_at` between `session_start_at` and `session_end_at`. If an event falls in multiple sessions, pick one (e.g. earliest session). Add columns: `session_id`, `session_start_at`, `session_end_at`. Events outside any session keep `session_id` (and session timestamps) null.
 - [ ] **4.10** Join events to **stg_players** to add `country_code`, `language_code`, `difficulty_selected`. In the final select add **seconds_since_session_start** = seconds from `session_start_at` to `event_at` (null when session_id is null). One row per event.
-
-<details>
-<summary>Check yourself — fct_game_events (4.8–4.10)</summary>
-
-```sql
-{{ config(materialized='table') }}
-with events as ( select * from {{ ref('stg_game_events') }} ),
-sessions as ( select session_id, player_id, session_start_at, session_end_at from {{ ref('stg_sessions') }} ),
-players as ( select player_id, country_code, language_code, difficulty_selected from {{ ref('stg_players') }} ),
-events_with_sessions as ( /* left join events to sessions on player_id and event_at between start/end; row_number() to pick one session per event */ ),
-final as ( select *, datediff('second', session_start_at, event_at) as seconds_since_session_start from ... )
-select * from final
-```
-
-</details>
-
 - [ ] **4.11** Add schema YAML for `dim_players`, `fct_sessions`, and `fct_game_events`: column descriptions and tests. Include `unique` + `not_null` on primary keys, `relationships`: `fct_sessions.player_id` → `dim_players.player_id`, `fct_game_events.session_id` → `fct_sessions.session_id`.
 
-<details>
-<summary>Check yourself — Core marts schema (4.11)</summary>
-
-```yaml
-# dim_players.yml / fct_sessions.yml / fct_game_events.yml
-models:
-  - name: dim_players
-    columns:
-      - name: player_id
-        tests: [unique, not_null]
-# + relationships on fct_sessions.player_id, fct_game_events.session_id
-```
-
-</details>
-
-#### Why this phase matters
-
-- Core marts (dimensions and facts) are the main interface between raw data and analytics: almost every metric is built on them.
-- Getting join keys, grain, and aggregations right here prevents subtle bugs in every dashboard and analysis that follows.
+---
 
 ### Phase 5: Analytics marts
 

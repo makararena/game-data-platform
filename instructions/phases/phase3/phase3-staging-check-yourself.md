@@ -174,3 +174,7 @@ dbt parse
 dbt run --select staging
 dbt test --select staging
 ```
+
+---
+
+Then proceed to [Phase 4: Core marts](../phase4/phase4-core-marts.md).
