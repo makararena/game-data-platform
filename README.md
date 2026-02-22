@@ -200,30 +200,9 @@ Verify each of the following:
 
 ### Phase 7: CI
 
+**Instructions:** [Phase 7 — Task](instructions/phases/phase7/phase7-ci.md) · [Phase 7 — Check yourself](instructions/phases/phase7/phase7-ci-check-yourself.md)
+
 - [ ] **7.1** Add a GitHub Actions workflow (e.g. `.github/workflows/dbt.yml`) that on push/PR to `main`: checks out repo, sets up Python, installs dbt-snowflake, runs `dbt deps`, loads Snowflake profile from a secret (e.g. `SNOWFLAKE_CI_PROFILE`), runs `dbt compile --target ci`, and runs `dbt build --target ci`. Ensure the CI target in the profile uses a dedicated schema so broken contracts or failing tests block the merge.
-
-<details>
-<summary>Check yourself (Phase 7 — CI)</summary>
-
-```yaml
-# .github/workflows/dbt.yml
-name: dbt
-on:
-  push:    { branches: [main] }
-  pull_request: { branches: [main] }
-jobs:
-  dbt-compile:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-      - run: pip install dbt-snowflake && dbt deps
-      - run: dbt compile --target ci
-      - run: dbt build --target ci
-# profile from secrets.SNOWFLAKE_CI_PROFILE
-```
-
-</details>
 
 #### Why this phase matters
 
