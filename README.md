@@ -129,11 +129,15 @@ Verify each of the following:
 
 ### Phase 1: Raw layer (sources)
 
+⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0%
+
 **Instructions:** [Phase 1 — Task](instructions/phases/phase1/phase1-raw-sources.md) · [Phase 1 — Check yourself](instructions/phases/phase1/phase1-raw-sources-check-yourself.md)
 
 ---
 
 ### Phase 2: Macros and multi-schema support
+
+🟩⬜⬜⬜⬜⬜⬜⬜⬜⬜ 10%
 
 **Instructions:** [Phase 2 — Task](instructions/phases/phase2/phase2-macros-schemas.md) · [Phase 2 — Check yourself](instructions/phases/phase2/phase2-macros-schemas-check-yourself.md)
 
@@ -147,6 +151,8 @@ Verify each of the following:
 
 ### Phase 3: Staging layer
 
+🟩🟩⬜⬜⬜⬜⬜⬜⬜⬜ 20%
+
 **Instructions:** [Phase 3 — Task](instructions/phases/phase3/phase3-staging.md) · [Phase 3 — Check yourself](instructions/phases/phase3/phase3-staging-check-yourself.md)
 
 - [ ] **3.1** Create **stg_players**: a view from `source('raw', 'raw_players')`. Output: `player_id`, `first_seen_at` (cast to timestamp), `country_code`, `language_code`, `difficulty_selected`. Materialize as view.
@@ -157,6 +163,8 @@ Verify each of the following:
 ---
 
 ### Phase 4: Core marts
+
+🟩🟩🟩⬜⬜⬜⬜⬜⬜⬜ 30%
 
 **Instructions:** [Phase 4 — Task](instructions/phases/phase4/phase4-core-marts.md) · [Phase 4 — Check yourself](instructions/phases/phase4/phase4-core-marts-check-yourself.md)
 
@@ -176,6 +184,8 @@ Verify each of the following:
 
 ### Phase 5: Analytics marts
 
+🟩🟩🟩🟩⬜⬜⬜⬜⬜⬜ 40%
+
 **Instructions:** [Phase 5 — Task](instructions/phases/phase5/phase5-analytics-marts.md) · [Phase 5 — Check yourself](instructions/phases/phase5/phase5-analytics-marts-check-yourself.md)
 
 - [ ] **5.1** Create **daily_active_players** as a materialized table. From **stg_sessions**, compute per (player_id, session_date, platform): session date, platform, sessions_count (count distinct session_id), total_playtime_minutes (sum duration). Join to **stg_players** for `country_code`, `difficulty_selected`.
@@ -190,6 +200,8 @@ Verify each of the following:
 
 ### Phase 6: Tests and quality
 
+🟩🟩🟩🟩🟩⬜⬜⬜⬜⬜ 50%
+
 **Instructions:** [Phase 6 — Task](instructions/phases/phase6/phase6-tests-quality.md) · [Phase 6 — Check yourself](instructions/phases/phase6/phase6-tests-quality-check-yourself.md)
 
 - [ ] **6.1** In schema YAMLs, ensure primary key columns have `unique` and `not_null`; foreign keys have `relationships` to the referenced model. Add `not_null` (or accepted_values) on other critical columns.
@@ -199,6 +211,8 @@ Verify each of the following:
 ---
 
 ### Phase 7: CI
+
+🟩🟩🟩🟩🟩🟩⬜⬜⬜⬜ 60%
 
 **Instructions:** [Phase 7 — Task](instructions/phases/phase7/phase7-ci.md) · [Phase 7 — Check yourself](instructions/phases/phase7/phase7-ci-check-yourself.md)
 
@@ -212,6 +226,8 @@ Verify each of the following:
 ---
 
 ### Phase 8 (Advanced): Incremental `fct_game_events`
+
+🟩🟩🟩🟩🟩🟩🟩⬜⬜⬜ 70%
 
 - [ ] **8.1** Update `fct_game_events` to use `materialized='incremental'` with a stable `unique_key` (e.g. `event_id`) and a sensible `on_schema_change` strategy.
 - [ ] **8.2** Implement an incremental filter with `is_incremental()` so that incremental runs only process **new** events (e.g. `event_at > max(event_at) in {{ this }}`).
@@ -258,6 +274,8 @@ Congratulations — you’ve completed all 8 core phases. The *Final Boss* secti
 ---
 
 ## 🏁 Final Boss: Product Questions You Must Be Able to Answer
+
+🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 100%
 
 ![Bloater](images/last-of-us/bloater.png)
 
