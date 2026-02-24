@@ -21,6 +21,53 @@ This phase sets up **schema separation**: raw tables stay in one schema (e.g. **
 - **2.4** In `dbt_project.yml`, under `models`, set **staging** folder to `+schema: staging` so staging models get the custom schema and the macro applies.
 - **2.5** In `dbt_project.yml`, under `models`, set **marts** folder to `+schema: marts` so mart models (Phase 4) are built in the MARTS schema.
 
+## Where to create the source YAMLs and how they should look
+
+- **Folder:** Place your source YAML files under the `models/sources` folder of the dbt project. For this repository the path is:
+
+  - game_analytics_dbt/models/sources
+
+- **Files to create:**
+  - raw_game_events.yml
+  - raw_players.yml
+  - raw_sessions.yml
+
+- **Quick commands to create the folder and an example file:**
+
+```bash
+mkdir -p game_analytics_dbt/models/sources
+cat > game_analytics_dbt/models/sources/raw_game_events.yml <<'YAML'
+version: 2
+
+sources:
+  - name: raw_game_events
+    database: "{{ target.database }}"
+    schema: "{{ var('raw_schema', 'RAW') }}"
+    tables:
+      - name: raw_game_events
+        description: "Raw game events table from ingest"
+YAML
+```
+
+- **Minimal YAML template (use for each source, update names/descriptions):**
+
+```yaml
+version: 2
+
+sources:
+  - name: <source_name>             # e.g. raw_players or raw_sessions
+    database: "{{ target.database }}"
+    schema: "{{ var('raw_schema', 'RAW') }}"
+    tables:
+      - name: <table_name>          # e.g. raw_players
+        description: "Raw <table_name> table"
+```
+
+- **Notes:**
+  - `database: "{{ target.database }}"` makes sources use the same database as your dbt `target`.
+  - `schema: "{{ var('raw_schema', 'RAW') }}"` ensures sources read from the RAW schema (or the value of `raw_schema`).
+  - Keep `version: 2` and list tables under `sources:` so dbt recognizes them.
+
 ---
 
 ## 1. Vars in `dbt_project.yml`
