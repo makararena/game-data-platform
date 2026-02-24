@@ -26,7 +26,7 @@ The hierarchy is simple: **player → sessions → events**. Your job is to turn
 
 ### Schema hierarchy (entities and relationships)
 
-There are **three entities**; all relationships are **one-to-many** (no many-to-many in the core model):
+There are **three entities**; all relationships are **one-to-many**:
 
 | Entity   | Raw table        | Grain              | Relationship                          |
 |----------|------------------|--------------------|---------------------------------------|
