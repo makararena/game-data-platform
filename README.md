@@ -87,6 +87,61 @@ The synthetic pipeline uses fixed sets of values. Useful for dbt `accepted_value
 
  ---
  
+## dbt commands we are gonna use and what they mean
+
+This project uses a small set of `dbt` commands during development and in CI. Below is what each command does, when to run it, and a short example.
+
+- **`dbt deps`**: Installs packages listed in `packages.yml` into the local `dbt_modules/` folder. Run this after cloning the repo or when `packages.yml` changes.
+
+```bash
+dbt deps
+```
+
+- **`dbt compile`**: Renders Jinja and SQL for all models, macros, and tests, and writes the compiled SQL to `target/compiled/`. Useful to quickly validate templating and macros without executing queries. In CI we run `dbt compile --target ci` to ensure the project compiles under the CI profile.
+
+```bash
+dbt compile
+dbt compile --target ci
+```
+
+- **`dbt build`**: The all-in-one command that runs `dbt run` (models), `dbt test` (schema & data tests), `dbt seed`, and `dbt snapshot` in the proper dependency order. Use this to execute models and tests together; CI uses `dbt build --target ci` so failing tests or models break the pipeline.
+
+```bash
+dbt build
+dbt build --target ci
+```
+
+- **`dbt run`**: Executes model SQL to create/update objects in the target database/schema. Use this locally when you only want to materialize models (not tests).
+
+```bash
+dbt run
+```
+
+- **`dbt test`**: Runs schema tests and any singular tests defined in `tests/` (e.g. `sessions_no_overlap.sql`). Use this to validate data quality after model runs, or run tests independently in CI if preferred.
+
+```bash
+dbt test
+```
+
+- **`dbt debug`**: Checks the active `profiles.yml`, confirms connection to the data warehouse, and validates the environment. Useful when setting up a new profile or troubleshooting CI credentials.
+
+```bash
+dbt debug
+```
+
+- **`dbt docs generate` / `dbt docs serve`**: Builds the documentation site (`target/catalog.json`, `manifest.json`) and serves it locally. Helpful for exploring model lineage and column descriptions.
+
+```bash
+dbt docs generate
+dbt docs serve
+```
+
+Notes:
+- In CI we prefer `dbt compile --target ci` to detect compilation issues early and `dbt build --target ci` to run models + tests and fail the job on error.
+- Use `--select` / `--exclude` flags to target subsets of models (e.g., `dbt build --select marts+`).
+- Keep secrets out of source: the workflow expects a `SNOWFLAKE_CI_PROFILE` secret that writes `~/.dbt/profiles.yml` during the run.
+
+ 
  ## Tasks
 
 Do the tasks in order. Each task is a single, clear step from start to finish.
