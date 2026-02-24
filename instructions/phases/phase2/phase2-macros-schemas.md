@@ -160,10 +160,7 @@ From your dbt project root:
 dbt parse
 ```
 
-Then inspect compiled schema names (no Snowflake run required):
-
-- Ensure sources in the manifest use `var('raw_schema')` (you can check the resolved source schema in the docs or manifest).
-- After you add staging models in Phase 3, `dbt run --select staging` will create views in the schema returned by the macro (e.g. STAGING). After you add marts in Phase 4, `dbt run --select marts` will create tables in MARTS.
+Then you can inspect compiled schema names (no Snowflake run required):
 
 You can also run `dbt debug` to confirm project and profile load; schema resolution is applied at compile/run time.
 
