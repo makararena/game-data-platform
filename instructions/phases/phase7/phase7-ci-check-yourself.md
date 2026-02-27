@@ -8,11 +8,36 @@ Verify the CI workflow and profile are configured correctly. The checklist below
 
 2. Workflow steps
    - `actions/checkout@v4`
-   - `actions/setup-python@v5` (or similar)
+   - `actions/setup-python@v5` (или аналог)
    - `pip install dbt-snowflake`
    - `dbt deps`
    - `dbt compile --target ci`
    - `dbt build --target ci`
+
+### Explanations of the actions used
+
+- **`actions/checkout@v4`**
+  : this is the official GitHub action that clones the repository onto the runner. without it the subsequent steps have no project code. version `v4` includes the latest security updates and fixes.
+
+- **`actions/setup-python@v5`**
+  : configures the specified Python version (in the example `3.11`) on the GitHub Actions virtual machine. after this step, the `python` and `pip` commands will be available at the desired version. version `v5` brings improvements such as package caching and more flexible version specification.
+
+The remaining commands install the dbt package, fetch dependencies, and perform project compilation/build.
+
+- **`pip install dbt-snowflake`**
+  : installs the dbt CLI plus the Snowflake adapter. this allows subsequent `dbt` commands to run and talk to Snowflake.
+
+- **`dbt deps`**
+  : downloads any packages declared in `packages.yml` (e.g. dbt-utils) into the `dbt_modules` directory. ensures macros and shared logic are available.
+
+- **`dbt compile --target ci`**
+  : parses and renders all models, macros and SQL into compiled SQL files in `target/` using the `ci` profile. it checks for syntax errors and unresolved references without touching the warehouse.
+
+- **`dbt build --target ci`**
+  : runs the full build (models, seeds, tests) against Snowflake using the `ci` target. this step exercises tests and fails the job on broken code or failing assertions.
+
+- **Profile generation step**
+  : the `mkdir`/`printf` block writes a `profiles.yml` file from the secret `SNOWFLAKE_CI_PROFILE`. it keeps credentials out of source control and adapts to GitHub Actions' environment.
 
 3. CI profile loaded from secret
    - GitHub secret `SNOWFLAKE_CI_PROFILE` exists and contains a valid `profiles.yml` snippet for a `ci` target (or use individual secrets and write `~/.dbt/profiles.yml` in the workflow).
