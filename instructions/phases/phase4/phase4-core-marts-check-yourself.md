@@ -1,6 +1,7 @@
 # Phase 4: Core marts — Check yourself
 
-This file gives the full SQL and schema solution for Phase 4. Try the [task](phase4-core-marts.md) first, then use this to compare.
+This file gives the full SQL and schema solution for Phase 4.
+Try the [task](phase4-core-marts.md) first, then use this to compare.
 
 ---
 

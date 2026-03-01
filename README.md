@@ -58,7 +58,7 @@ The synthetic pipeline uses fixed sets of values. Useful for dbt `accepted_value
 | **country**    | `RAW_PLAYERS`   | `US`, `PL`, `DE`, `FR`, `ES`, `BY` |
 | **language**   | `RAW_PLAYERS`   | `en`, `pl`, `de`, `fr`, `es`, `be` |
 | **difficulty_selected** | `RAW_PLAYERS` | `easy`, `normal`, `hard`, `grounded` |
-| **platform**   | `RAW_SESSIONS`, `RAW_GAME_EVENTS` | `ps5`, `pc` |
+| **platform**   | `RAW_SESSIONS`, `RAW_GAME_EVENTS` | `ps3`, `xbox360`, `pc` |
 | **event_name** | `RAW_GAME_EVENTS` | `game_started`, `chapter_started`, `checkpoint_reached`, `enemy_killed`, `player_died`, `item_crafted`, `chapter_completed`, `game_closed` |
 
 **properties** (in `RAW_GAME_EVENTS`) is a JSON/VARIANT; not every event has every key. Possible keys and example values:
@@ -238,51 +238,11 @@ Verify each of the following:
 
 ---
 
-### Phase 8 (Advanced): Incremental `fct_game_events`
+### Phase 8 (Advanced): Incremental `fct_game_events` + `fct_sessions`
 
 🟩🟩🟩🟩🟩🟩🟩⬜⬜⬜ 70%
 
-- [ ] **8.1** Update `fct_game_events` to use `materialized='incremental'` with a stable `unique_key` (e.g. `event_id`) and a sensible `on_schema_change` strategy.
-- [ ] **8.2** Implement an incremental filter with `is_incremental()` so that incremental runs only process **new** events (e.g. `event_at > max(event_at) in {{ this }}`).
-- [ ] **8.3** Run a full-refresh and an incremental run, compare row counts and tests, and make sure incremental behavior matches the full build.
-
-<details>
-<summary>Check yourself (Phase 8 — incremental fct_game_events)</summary>
-
-```sql
-{{ config(
-  materialized = 'incremental',
-  unique_key   = 'event_id',
-  on_schema_change = 'ignore',  -- or 'append_new_columns' / 'sync_all_columns'
-) }}
-
-with events as (
-  select * from {{ ref('stg_game_events') }}
-  -- joins and enrichments here
-)
-
-{% if is_incremental() %}
-  -- Only process events later than what we already have
-  , filtered as (
-      select *
-      from events
-      where event_at > (select coalesce(max(event_at), '1900-01-01') from {{ this }})
-    )
-  select * from filtered
-{% else %}
-  select * from events
-{% endif %}
-```
-
-</details>
-
-#### Why this phase matters
-
-- Real production warehouses rarely rebuild large event tables from scratch — **incremental models** keep compute + cost under control.
-- Designing a correct incremental filter (grain, unique key, late-arriving data) forces you to think carefully about **time, idempotency, and data correctness**.
-
-
-Congratulations — you’ve completed all 8 core phases. The *Final Boss* section below is the bonus challenge.
+**Instructions:** [Phase 8 — Task](instructions/phases/phase8/phase8-incremental-fct-game-events.md) · [Phase 8 — Check yourself](instructions/phases/phase8/phase8-incremental-fct-game-events-check-yourself.md)
 
 ---
 

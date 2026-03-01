@@ -14,6 +14,7 @@ vars:
   raw_schema: 'RAW'
   staging_schema: 'STAGING'
   marts_schema: 'MARTS'
+  ci_schema: 'CI'
 
 # Under models: → game_dbt_project: (or your project name)
 models:
@@ -32,14 +33,19 @@ Create the file with this content:
 
 ```sql
 {% macro generate_schema_name(custom_schema_name, node) -%}
-    {%- if custom_schema_name is none -%}
-        {{ target.schema }}
-    {%- elif custom_schema_name | trim | lower == 'staging' -%}
-        {{ var('staging_schema', 'STAGING') }}
-    {%- elif custom_schema_name | trim | lower == 'marts' -%}
-        {{ var('marts_schema', 'MARTS') }}
+    {%- set base_schema = target.schema -%}
+    {%- if target.name == 'ci' -%}
+        {{ var('ci_schema', 'CI') }}
     {%- else -%}
-        {{ target.schema }}_{{ custom_schema_name | trim }}
+        {%- if custom_schema_name is none -%}
+            {{ base_schema }}
+        {%- elif custom_schema_name | trim | lower == 'staging' -%}
+            {{ var('staging_schema', 'STAGING') }}
+        {%- elif custom_schema_name | trim | lower == 'marts' -%}
+            {{ var('marts_schema', 'MARTS') }}
+        {%- else -%}
+            {{ base_schema }}_{{ custom_schema_name | trim | upper }}
+        {%- endif -%}
     {%- endif -%}
 {%- endmacro %}
 ```

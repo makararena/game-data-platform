@@ -22,8 +22,9 @@ EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
 LOAD_BATCH_ID = int(os.getenv("LOAD_BATCH_ID", "1"))  # For incremental: batch 2+ = new sessions, unique IDs
 
 PLATFORMS = [
-    ("ps5", 0.7),
-    ("pc", 0.3),
+    ("ps3", 0.50),
+    ("xbox360", 0.35),
+    ("pc", 0.15),
 ]
 
 SESSION_LENGTH_MINUTES = {

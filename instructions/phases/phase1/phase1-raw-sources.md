@@ -84,7 +84,7 @@ In each file, define the **same** source block so dbt can merge them:
 
 - **`unique` + `not_null` on primary keys:** The primary key (e.g. `player_id`, `session_id`, `event_id`) is the single identifier for a row. If it’s null or duplicated, joins and aggregations give wrong results. Enforcing this at the source prevents subtle bugs downstream.
 - **`not_null` on foreign keys (e.g. `player_id` in sessions/events):** Sessions and events must belong to a player. Null `player_id` would break joins and make “per player” metrics incorrect.
-- **`accepted_values` on difficulty and platform:** These fields are controlled enums produced by the game and the ingest. Restricting values to the known set (e.g. `easy`, `normal`, `hard`, `grounded` and `ps5`, `pc`) catches typos, bad CSV data, or schema drift early.
+- **`accepted_values` on difficulty and platform:** These fields are controlled enums produced by the game and the ingest. Restricting values to the known set (e.g. `easy`, `normal`, `hard`, `grounded` and `ps3`, `xbox360`, `pc`) catches typos, bad CSV data, or schema drift early.
 
 ---
 
@@ -95,7 +95,7 @@ Use these values so your tests match the synthetic pipeline and the main [README
 | Field                 | Table(s)                    | Unique values                              |
 |-----------------------|-----------------------------|--------------------------------------------|
 | **difficulty_selected** | `raw_players`             | `easy`, `normal`, `hard`, `grounded`       |
-| **platform**          | `raw_sessions`, `raw_game_events` | `ps5`, `pc`                          |
+| **platform**          | `raw_sessions`, `raw_game_events` | `ps3`, `xbox360`, `pc`               |
 
 **Why use this reference:** The ingest and the main [README](../../../README.md) use the same canonical values. Aligning `accepted_values` with them ensures source tests pass for data produced by the platform and keeps documentation and tests in sync.
 

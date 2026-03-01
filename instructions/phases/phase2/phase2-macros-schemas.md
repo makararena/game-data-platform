@@ -15,28 +15,34 @@ This phase sets up **schema separation**: raw tables stay in one schema (e.g. **
 
 ## Goals
 
-- **2.1** Add **vars** `raw_schema`, `staging_schema`, and `marts_schema` in `dbt_project.yml` so schema names are configurable.
+- **2.1** Add **vars** `raw_schema`, `staging_schema`, `marts_schema`, and `ci_schema` in `dbt_project.yml` so schema names are configurable.
 - **2.2** Set each **source**’s `schema` to `"{{ var('raw_schema', 'RAW') }}"` so sources point at the raw schema regardless of `target.schema`.
-- **2.3** Create the **`generate_schema_name`** macro so that models with custom schema `staging` are built in `var('staging_schema', 'STAGING')`, models with `marts` in `var('marts_schema', 'MARTS')`; other models use `target.schema` (or default concatenation).
+- **2.3** Create the **`generate_schema_name`** macro so that:
+  - `target.name == 'ci'` routes all model builds to `var('ci_schema', 'CI')`
+  - `staging` routes to `var('staging_schema', 'STAGING')`
+  - `marts` routes to `var('marts_schema', 'MARTS')`
+  - other custom schemas use default concatenation from `target.schema`.
 - **2.4** In `dbt_project.yml`, under `models`, set **staging** folder to `+schema: staging` so staging models get the custom schema and the macro applies.
 - **2.5** In `dbt_project.yml`, under `models`, set **marts** folder to `+schema: marts` so mart models (Phase 4) are built in the MARTS schema.
 
 ## 1. Vars in `dbt_project.yml`
 
-Add three variables at the top level (e.g. after `profile:`):
+Add four variables at the top level (e.g. after `profile:`):
 
 ```yaml
 vars:
   raw_schema: 'RAW'
   staging_schema: 'STAGING'
   marts_schema: 'MARTS'
+  ci_schema: 'CI'
 ```
 
 - **`raw_schema`** — The Snowflake schema where raw tables live (where the ingest wrote `RAW_PLAYERS`, etc.). Sources will use this so they never depend on `target.schema` for reading raw data.
 - **`staging_schema`** — The schema where staging models (Phase 3) will be built. The macro will return this when the model’s custom schema is `staging`.
 - **`marts_schema`** — The schema where mart models (Phase 4 and beyond) will be built. The macro will return this when the model's custom schema is `marts`.
+- **`ci_schema`** — The schema used by CI runs (`--target ci`) so build/test artifacts are isolated from dev/prod schemas.
 
-**Why vars:** Different environments (dev/prod) or tenants might use different schema names. Centralizing them in vars gives one place to change and allows overrides via CLI: `dbt run --vars '{"raw_schema":"RAW","staging_schema":"STAGING","marts_schema":"MARTS"}'` without editing YAML or the macro.
+**Why vars:** Different environments (dev/prod/ci) or tenants might use different schema names. Centralizing them in vars gives one place to change and allows overrides via CLI: `dbt run --vars '{"raw_schema":"RAW","staging_schema":"STAGING","marts_schema":"MARTS","ci_schema":"CI"}'` without editing YAML or the macro.
 
 ---
 
@@ -61,24 +67,38 @@ Create **`macros/generate_schema_name.sql`**:
 
 ```sql
 {% macro generate_schema_name(custom_schema_name, node) -%}
-    {%- if custom_schema_name is none -%}
-        {{ target.schema }}
-    {%- elif custom_schema_name | trim | lower == 'staging' -%}
-        {{ var('staging_schema', 'STAGING') }}
-    {%- elif custom_schema_name | trim | lower == 'marts' -%}
-        {{ var('marts_schema', 'MARTS') }}
+
+    {%- set base_schema = target.schema -%}
+
+    {# ---- CI ENV ---- #}
+    {%- if target.name == 'ci' -%}
+        {{ var('ci_schema', 'CI') }}
+
+    {# ---- NON-CI ENV ---- #}
     {%- else -%}
-        {{ target.schema }}_{{ custom_schema_name | trim }}
+
+        {%- if custom_schema_name is none -%}
+            {{ base_schema }}
+        {%- elif custom_schema_name | trim | lower == 'staging' -%}
+            {{ var('staging_schema', 'STAGING') }}
+        {%- elif custom_schema_name | trim | lower == 'marts' -%}
+            {{ var('marts_schema', 'MARTS') }}
+        {%- else -%}
+            {{ base_schema }}_{{ custom_schema_name | trim | upper }}
+        {%- endif -%}
+
     {%- endif -%}
+
 {%- endmacro %}
 ```
 
 **Why it works:**
 
+- In CI (`target.name == 'ci'`), all models are routed to `var('ci_schema', 'CI')` for isolation.
 - When **no custom schema** is set (`custom_schema_name is none`), the model uses `target.schema` (default behavior).
-- When the custom schema is **`staging`** (set for the staging folder), the macro returns `var('staging_schema', 'STAGING')`, so staging views are created in that schema.
-- When the custom schema is **`marts`** (set for the marts folder), the macro returns `var('marts_schema', 'MARTS')`, so mart models (Phase 4) are built in that schema.
-- For **any other** custom schema, the macro uses `target.schema + "_" + custom_schema` so you can add more layers without changing the macro each time.
+- When the custom schema is **`staging`** (set for the staging folder), the macro returns `var('staging_schema', 'STAGING')`.
+- When the custom schema is **`marts`** (set for the marts folder), the macro returns `var('marts_schema', 'MARTS')`.
+- For **any other** custom schema, the macro uses `target.schema + "_" + upper(custom_schema)`.
 
 **Internals:** dbt passes the model’s `schema` config (or the folder’s `+schema`) as `custom_schema_name`. The macro’s return value is the actual Snowflake schema name used when creating the relation.
 

@@ -253,7 +253,7 @@ models:
         tests:
           - not_null
       - name: platform
-        description: Platform (e.g. ps5, pc).
+        description: Platform (e.g. ps3, xbox360, pc).
       - name: country_code
         description: Player country code.
       - name: difficulty_selected

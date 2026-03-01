@@ -49,6 +49,16 @@ def weighted_choice(choices):
     return random.choices(values, weights=weights, k=1)[0]
 
 
+def random_case_variant(value: str) -> str:
+    """Return a deterministic-random case variant for raw data realism."""
+    variants = [
+        value.lower(),
+        value.upper(),
+        value.title(),
+    ]
+    return random.choice(variants)
+
+
 def random_past_timestamp(days_back: int = 90) -> datetime:
     """Generate a random timestamp in the past"""
     return datetime.utcnow() - timedelta(
@@ -83,11 +93,9 @@ def generate_players(n_players: int) -> pd.DataFrame:
         player = {
             "player_id": player_id,
             "first_seen_at": random_timestamp_in_event_range(),
-            "country": country,
-            "language": language,
-            "difficulty_selected": weighted_choice(
-                DIFFICULTY_DISTRIBUTION
-            ),
+            "country": random_case_variant(country),
+            "language": random_case_variant(language),
+            "difficulty_selected": weighted_choice(DIFFICULTY_DISTRIBUTION),
         }
 
         rows.append(player)

@@ -78,7 +78,8 @@ sources:
               - accepted_values:
                   arguments:
                     values:
-                      - "ps5"
+                      - "ps3"
+                      - "xbox360"
                       - "pc"
 ```
 
@@ -118,7 +119,8 @@ sources:
               - accepted_values:
                   arguments:
                     values:
-                      - "ps5"
+                      - "ps3"
+                      - "xbox360"
                       - "pc"
           - name: game_version
             description: Game version at time of event.
