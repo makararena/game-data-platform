@@ -277,26 +277,20 @@ Work through each question below: read the task, solve it using your warehouse, 
 
 ---
 
-#### Question 1 — D1, D3, and D7 retention rates
+#### Task 1: D1, D3, and D7 retention rates
 
-| Step | What to do |
-|------|------------|
-| **Read** | Compute **D1, D3, and D7 retention rates** (one rate per day) from your `retention` mart. |
-| **Solve** | Write a query that returns three rows: `retention_day` (1, 3, 7) and `retention_rate_pct`. |
-| **Check** | Open “Check your answer” below and confirm your method matches the criteria. Then compare with “Reference solution” if needed. |
+Compute D1, D3, and D7 retention rates (one rate per day) from your retention mart.
 
-<details>
-<summary>✓ Check your answer</summary>
-
-Your solution should:
+**Your solution should:**
 
 - Use **weighted retention**: `sum(active_players) / sum(cohort_size)` (not a plain average of per-cohort percentages).
 - Include **only mature cohorts** for each day (e.g. for D7, only cohorts that are at least 7 days old).
-- Include cohorts with **zero** retained players (e.g. `LEFT JOIN` + `COALESCE(active_players, 0)`), so retention isn’t biased upward.
-</details>
+- Include cohorts with **zero** retained players (e.g. `LEFT JOIN` + `COALESCE(active_players, 0)`), so retention isn't biased upward.
+
+**The output should look like:** three rows with `retention_day` (1, 3, 7) and `retention_rate_pct`.
 
 <details>
-<summary>📄 Reference solution (SQL)</summary>
+<summary>Check Solution</summary>
 
 ```sql
 with cohort_base as (
@@ -365,26 +359,20 @@ This query avoids bias by: (1) including cohorts with zero retained players, (2)
 
 ---
 
-#### Question 2 — Countries with the lowest retention
+#### Task 2: Countries with the lowest retention
 
-| Step | What to do |
-|------|------------|
-| **Read** | Find which **countries** have the **lowest retention**. Use one fixed day (e.g. D7). |
-| **Solve** | Return a short list (e.g. top 10) of countries with their D7 retention rate and sample size. |
-| **Check** | Use “Check your answer” to confirm methodology; use “Reference solution” to compare. |
+Find which **countries** have the **lowest retention**. Use one fixed day (e.g. D7).
 
-<details>
-<summary>✓ Check your answer</summary>
-
-Your solution should:
+**Your solution should:**
 
 - Use **one fixed day** (commonly D7) and **only mature cohorts** for that day.
-- Apply a **minimum sample size** (e.g. `HAVING sum(cohort_size) >= 50`) so tiny countries don’t dominate the bottom list by noise.
+- Apply a **minimum sample size** (e.g. `HAVING sum(cohort_size) >= 50`) so tiny countries don't dominate the bottom list by noise.
 - Use **weighted** retention by cohort size, not a simple average of per-country percentages.
-</details>
+
+**The output should look like:** a short list (e.g. top 10) of countries with `country_code`, D7 retention rate, and sample size (`total_players_in_scope`).
 
 <details>
-<summary>📄 Reference solution (SQL)</summary>
+<summary>Check Solution</summary>
 
 ```sql
 with cohort_base as (
@@ -443,26 +431,20 @@ Produces a stable ranking by country using weighted D7 retention and a minimum v
 
 ---
 
-#### Question 3 — Retention by difficulty
+#### Task 3: Retention by difficulty
 
-| Step | What to do |
-|------|------------|
-| **Read** | Determine whether retention differs by **difficulty_selected** (e.g. easy vs normal vs hard). |
-| **Solve** | Compare retention at the same day(s) (e.g. D7) across difficulties; return difficulty, sample size, and retention rate. |
-| **Check** | Verify with “Check your answer”; compare with “Reference solution” if needed. |
+Determine whether retention differs by **difficulty_selected** (e.g. easy vs normal vs hard).
 
-<details>
-<summary>✓ Check your answer</summary>
-
-Your solution should:
+**Your solution should:**
 
 - Compare retention at the **same day(s)** (e.g. D1 and/or D7) across difficulties.
 - Use **weighted rates** and **mature cohorts only**.
-- Optionally apply a minimum sample size per difficulty so small groups don’t skew the comparison.
-</details>
+- Optionally apply a minimum sample size per difficulty so small groups don't skew the comparison.
+
+**The output should look like:** rows with `difficulty_selected`, sample size (`total_players_in_scope`), and D7 retention rate.
 
 <details>
-<summary>📄 Reference solution (SQL)</summary>
+<summary>Check Solution</summary>
 
 ```sql
 with cohort_base as (
@@ -521,25 +503,19 @@ Lower retention for higher difficulty at D1/D7 indicates faster churn for harder
 
 ---
 
-#### Question 4 — Share of players with only one session
+#### Task 4: Share of players with only one session
 
-| Step | What to do |
-|------|------------|
-| **Read** | What **% of players** have **only one session**? |
-| **Solve** | Return a single percentage (e.g. `pct_players_only_one_session`). |
-| **Check** | Use “Check your answer” and “Reference solution” to confirm. |
+What **% of players** have **only one session**?
 
-<details>
-<summary>✓ Check your answer</summary>
-
-Your solution should:
+**Your solution should:**
 
 - Use **`dim_players`**, which already has `total_sessions` per player (avoids re-aggregating from session facts).
 - Compute: `count(players where total_sessions = 1) * 100 / count(*)`.
-</details>
+
+**The output should look like:** a single percentage (e.g. `pct_players_only_one_session`).
 
 <details>
-<summary>📄 Reference solution (SQL)</summary>
+<summary>Check Solution</summary>
 
 ```sql
 select
@@ -552,25 +528,19 @@ This is the direct churn-risk share for players who never progressed beyond thei
 
 ---
 
-#### Question 5 — Share of players who return for a second session
+#### Task 5: Share of players who return for a second session
 
-| Step | What to do |
-|------|------------|
-| **Read** | What **% of players** return for a **second session** (i.e. have at least 2 sessions)? |
-| **Solve** | Return a single percentage. This is the complement of Question 4. |
-| **Check** | Verify with “Check your answer” and “Reference solution”. |
+What **% of players** return for a **second session** (i.e. have at least 2 sessions)? This is the complement of Task 4.
 
-<details>
-<summary>✓ Check your answer</summary>
+**Your solution should:**
 
-Your solution should:
-
-- Use the **same denominator** as Q4 (all players in `dim_players`) for consistency.
+- Use the **same denominator** as Task 4 (all players in `dim_players`) for consistency.
 - Compute: `count(players where total_sessions >= 2) * 100 / count(*)`.
-</details>
+
+**The output should look like:** a single percentage (e.g. `pct_players_with_second_session`).
 
 <details>
-<summary>📄 Reference solution (SQL)</summary>
+<summary>Check Solution</summary>
 
 ```sql
 select
