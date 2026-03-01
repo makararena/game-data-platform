@@ -62,6 +62,18 @@ jobs:
 
 Add repository secret `SNOWFLAKE_CI_PROFILE` with a valid `profiles.yml` that contains a `ci` target.
 
+### Notes on each workflow step
+
+- **`actions/checkout@v4`** – clones the repository onto the runner; subsequent steps need the project files. `v4` is the current stable release with security fixes.
+- **`actions/setup-python@v5`** – installs the specified Python version (`3.11` in the example) and exposes `python`/`pip` at that version. `v5` adds package caching and flexible version specification.
+- **`pip install dbt-snowflake`** – brings in the dbt CLI and Snowflake adapter so subsequent dbt commands can execute.
+- **`dbt deps`** – pulls any packages defined in `packages.yml` (e.g. `dbt-utils`) into `dbt_modules`, making shared macros available.
+- **`dbt compile --target ci`** – renders all models, macros and SQL to compiled files using the `ci` profile, catching syntax errors and bad references without touching the warehouse.
+- **`dbt build --target ci`** – runs the full build (models, seeds, tests) against Snowflake using the `ci` target; failures cause the job to exit non‑zero.
+- **Profile generation step** – `mkdir`/`printf` writes `~/.dbt/profiles.yml` from the secret `SNOWFLAKE_CI_PROFILE`, keeping credentials out of source control.
+
+For a completed example and additional guidance, see the [Phase 7 solution](phase7-ci-solution.md).
+
 ---
 
 ## 2. Branch workflow and commits
@@ -85,21 +97,21 @@ Then in GitHub:
 
 ---
 
-## 2 Настраиваем защиту main
+## 2 Configure protection for `main`
 
-В GitHub:
+In GitHub:
 
 Repo -> Settings -> Branches -> Add branch protection rule
 
-Выбираешь branch: `main`
+Choose branch: `main`
 
-И включаешь:
+And enable:
 
 ✔ Require a pull request before merging  
 ✔ Require status checks to pass before merging  
-✔ Выбери job `dbt`
+✔ Select the `dbt` job
 
-Сохраняешь.
+Save the rule.
 
 ---
 
