@@ -265,83 +265,838 @@ After completing all phases (sources → macros/schemas → staging → marts �
 
 If you can answer these — your warehouse is working.
 
+---
+
 ### 1. Retention & Player Return
 
-1. What are **D1, D3, and D7 retention rates**?
-2. Which **countries** have the lowest retention?
-3. Does retention differ by **difficulty_selected**?
-4. What % of players have **only one session**?
-5. What % of players return for a **second session**?
+**Models you’ll use:** `retention`, `dim_players` (and optionally staging for max date).
 
-Goal: understand whether players come back — and who does not.
+**Goal:** Understand whether players come back — and who does not.
+
+Work through each question below: read the task, solve it using your warehouse, then use **Check your answer** to verify your approach and **Reference solution** only if you’re stuck.
+
+---
+
+#### Question 1 — D1, D3, and D7 retention rates
+
+| Step | What to do |
+|------|------------|
+| **Read** | Compute **D1, D3, and D7 retention rates** (one rate per day) from your `retention` mart. |
+| **Solve** | Write a query that returns three rows: `retention_day` (1, 3, 7) and `retention_rate_pct`. |
+| **Check** | Open “Check your answer” below and confirm your method matches the criteria. Then compare with “Reference solution” if needed. |
 
 <details>
-<summary>Check yourself — 1. Retention & Player Return</summary>
+<summary>✓ Check your answer</summary>
 
-- **Q1 – D1/D3/D7 retention**: use the `retention` model; filter `days_since_cohort IN (1, 3, 7)` and read `retention_rate_pct` for those days (optionally averaging across cohorts).
-- **Q2 – Countries with lowest retention**: from `retention`, group by `country_code` and a chosen `days_since_cohort` (e.g. 1 or 7), order by `retention_rate_pct` ascending.
-- **Q3 – Retention by difficulty**: same `retention` model, grouped by `difficulty_selected` and `days_since_cohort`.
-- **Q4 – % of players with only one session**: from `dim_players`, compute `count(*) WHERE total_sessions = 1` divided by `count(*)` overall.
-- **Q5 – % of players returning for a second session**: from `dim_players`, compute `count(*) WHERE total_sessions >= 2` divided by `count(*)` overall.
+Your solution should:
 
+- Use **weighted retention**: `sum(active_players) / sum(cohort_size)` (not a plain average of per-cohort percentages).
+- Include **only mature cohorts** for each day (e.g. for D7, only cohorts that are at least 7 days old).
+- Include cohorts with **zero** retained players (e.g. `LEFT JOIN` + `COALESCE(active_players, 0)`), so retention isn’t biased upward.
+</details>
+
+<details>
+<summary>📄 Reference solution (SQL)</summary>
+
+```sql
+with cohort_base as (
+    select
+        cohort_date,
+        country_code,
+        difficulty_selected,
+        max(cohort_size) as cohort_size
+    from GAME_ANALYTICS.MARTS.RETENTION
+    where days_since_cohort = 0
+    group by 1, 2, 3
+),
+
+max_date as (
+    select max(date(session_end_at)) as max_data_date
+    from GAME_ANALYTICS.STAGING.STG_SESSIONS
+),
+
+target_days as (
+    select days_since_cohort
+    from (
+        select 1 as days_since_cohort
+        union all
+        select 3 as days_since_cohort
+        union all
+        select 7 as days_since_cohort
+    ) t
+),
+
+cohort_day_grid as (
+    select
+        c.cohort_date,
+        c.country_code,
+        c.difficulty_selected,
+        d.days_since_cohort,
+        c.cohort_size
+    from cohort_base c
+    cross join target_days d
+    cross join max_date m
+    where c.cohort_date <= dateadd(day, -d.days_since_cohort, m.max_data_date)
+),
+
+retention_filled as (
+    select
+        g.days_since_cohort,
+        coalesce(r.active_players, 0) as active_players,
+        g.cohort_size
+    from cohort_day_grid g
+    left join GAME_ANALYTICS.MARTS.RETENTION r
+        on r.cohort_date = g.cohort_date
+        and r.country_code = g.country_code
+        and r.difficulty_selected = g.difficulty_selected
+        and r.days_since_cohort = g.days_since_cohort
+)
+
+select
+    days_since_cohort as retention_day,
+    round(sum(active_players) * 100.0 / nullif(sum(cohort_size), 0), 2) as retention_rate_pct
+from retention_filled
+group by 1
+order by 1;
+```
+
+This query avoids bias by: (1) including cohorts with zero retained players, (2) weighting by cohort size, (3) excluding immature cohorts per target day.
+</details>
+
+---
+
+#### Question 2 — Countries with the lowest retention
+
+| Step | What to do |
+|------|------------|
+| **Read** | Find which **countries** have the **lowest retention**. Use one fixed day (e.g. D7). |
+| **Solve** | Return a short list (e.g. top 10) of countries with their D7 retention rate and sample size. |
+| **Check** | Use “Check your answer” to confirm methodology; use “Reference solution” to compare. |
+
+<details>
+<summary>✓ Check your answer</summary>
+
+Your solution should:
+
+- Use **one fixed day** (commonly D7) and **only mature cohorts** for that day.
+- Apply a **minimum sample size** (e.g. `HAVING sum(cohort_size) >= 50`) so tiny countries don’t dominate the bottom list by noise.
+- Use **weighted** retention by cohort size, not a simple average of per-country percentages.
+</details>
+
+<details>
+<summary>📄 Reference solution (SQL)</summary>
+
+```sql
+with cohort_base as (
+    select
+        cohort_date,
+        country_code,
+        difficulty_selected,
+        max(cohort_size) as cohort_size
+    from GAME_ANALYTICS.MARTS.RETENTION
+    where days_since_cohort = 0
+    group by 1, 2, 3
+),
+
+max_date as (
+    select max(date(session_end_at)) as max_data_date
+    from GAME_ANALYTICS.STAGING.STG_SESSIONS
+),
+
+cohort_day_grid as (
+    select
+        cohort_date,
+        country_code,
+        difficulty_selected,
+        7 as days_since_cohort,
+        cohort_size
+    from cohort_base
+    cross join max_date
+    where cohort_date <= dateadd(day, -7, max_data_date)
+),
+
+retention_filled as (
+    select
+        g.country_code,
+        coalesce(r.active_players, 0) as active_players,
+        g.cohort_size
+    from cohort_day_grid g
+    left join GAME_ANALYTICS.MARTS.RETENTION r
+        on r.cohort_date = g.cohort_date
+        and r.country_code = g.country_code
+        and r.difficulty_selected = g.difficulty_selected
+        and r.days_since_cohort = g.days_since_cohort
+)
+select
+    country_code,
+    sum(cohort_size) as total_players_in_scope,
+    round(sum(active_players) * 100.0 / nullif(sum(cohort_size), 0), 2) as d7_retention_rate_pct
+from retention_filled
+group by 1
+having sum(cohort_size) >= 50
+order by d7_retention_rate_pct asc, total_players_in_scope desc
+limit 10;
+```
+
+Produces a stable ranking by country using weighted D7 retention and a minimum volume threshold.
+</details>
+
+---
+
+#### Question 3 — Retention by difficulty
+
+| Step | What to do |
+|------|------------|
+| **Read** | Determine whether retention differs by **difficulty_selected** (e.g. easy vs normal vs hard). |
+| **Solve** | Compare retention at the same day(s) (e.g. D7) across difficulties; return difficulty, sample size, and retention rate. |
+| **Check** | Verify with “Check your answer”; compare with “Reference solution” if needed. |
+
+<details>
+<summary>✓ Check your answer</summary>
+
+Your solution should:
+
+- Compare retention at the **same day(s)** (e.g. D1 and/or D7) across difficulties.
+- Use **weighted rates** and **mature cohorts only**.
+- Optionally apply a minimum sample size per difficulty so small groups don’t skew the comparison.
+</details>
+
+<details>
+<summary>📄 Reference solution (SQL)</summary>
+
+```sql
+with cohort_base as (
+    select
+        cohort_date,
+        country_code,
+        difficulty_selected,
+        max(cohort_size) as cohort_size
+    from GAME_ANALYTICS.MARTS.RETENTION
+    where days_since_cohort = 0
+    group by 1, 2, 3
+),
+
+max_date as (
+    select max(date(session_end_at)) as max_data_date
+    from GAME_ANALYTICS.STAGING.STG_SESSIONS
+),
+
+cohort_day_grid as (
+    select
+        cohort_date,
+        country_code,
+        difficulty_selected,
+        7 as days_since_cohort,
+        cohort_size
+    from cohort_base
+    cross join max_date
+    where cohort_date <= dateadd(day, -7, max_data_date)
+),
+
+retention_filled as (
+    select
+        g.difficulty_selected,
+        coalesce(r.active_players, 0) as active_players,
+        g.cohort_size
+    from cohort_day_grid g
+    left join GAME_ANALYTICS.MARTS.RETENTION r
+        on r.cohort_date = g.cohort_date
+        and r.country_code = g.country_code
+        and r.difficulty_selected = g.difficulty_selected
+        and r.days_since_cohort = g.days_since_cohort
+)
+select
+    difficulty_selected,
+    sum(cohort_size) as total_players_in_scope,
+    round(sum(active_players) * 100.0 / nullif(sum(cohort_size), 0), 2) as d7_retention_rate_pct
+from retention_filled
+group by 1
+having sum(cohort_size) >= 50
+order by d7_retention_rate_pct asc, total_players_in_scope desc
+limit 10;
+```
+
+Lower retention for higher difficulty at D1/D7 indicates faster churn for harder modes.
+</details>
+
+---
+
+#### Question 4 — Share of players with only one session
+
+| Step | What to do |
+|------|------------|
+| **Read** | What **% of players** have **only one session**? |
+| **Solve** | Return a single percentage (e.g. `pct_players_only_one_session`). |
+| **Check** | Use “Check your answer” and “Reference solution” to confirm. |
+
+<details>
+<summary>✓ Check your answer</summary>
+
+Your solution should:
+
+- Use **`dim_players`**, which already has `total_sessions` per player (avoids re-aggregating from session facts).
+- Compute: `count(players where total_sessions = 1) * 100 / count(*)`.
+</details>
+
+<details>
+<summary>📄 Reference solution (SQL)</summary>
+
+```sql
+select
+    round(count_if(total_sessions = 1) * 100.0 / nullif(count(*), 0), 2) as pct_players_only_one_session
+from GAME_ANALYTICS.MARTS.DIM_PLAYERS;
+```
+
+This is the direct churn-risk share for players who never progressed beyond their first session.
+</details>
+
+---
+
+#### Question 5 — Share of players who return for a second session
+
+| Step | What to do |
+|------|------------|
+| **Read** | What **% of players** return for a **second session** (i.e. have at least 2 sessions)? |
+| **Solve** | Return a single percentage. This is the complement of Question 4. |
+| **Check** | Verify with “Check your answer” and “Reference solution”. |
+
+<details>
+<summary>✓ Check your answer</summary>
+
+Your solution should:
+
+- Use the **same denominator** as Q4 (all players in `dim_players`) for consistency.
+- Compute: `count(players where total_sessions >= 2) * 100 / count(*)`.
+</details>
+
+<details>
+<summary>📄 Reference solution (SQL)</summary>
+
+```sql
+select
+    round(count_if(total_sessions >= 2) * 100.0 / nullif(count(*), 0), 2) as pct_players_with_second_session
+from GAME_ANALYTICS.MARTS.DIM_PLAYERS;
+```
+
+Together with Q4, this gives a clear first-return health check.
 </details>
 
 ### 2. Drop-Off & Friction
 
 6. At which step of the session funnel do players drop the most?
-7. What % of sessions never reach a **checkpoint**?
-8. What % of sessions start a chapter but never complete one?
-9. Are there sessions with **high deaths but low progression**?
-
-Goal: identify friction points in the core loop.
 
 <details>
-<summary>Check yourself — 2. Drop-Off & Friction</summary>
+<summary>Check Answer in details</summary>
 
-- **Q6 – Funnel step with biggest drop**: use `funnel_sessions`; compare `sessions_with_*` columns vs `total_sessions` for each step to see where conversion rate is lowest.
-- **Q7 – % of sessions without a checkpoint**: in `funnel_sessions`, compute `1 - sessions_with_checkpoint_reached / total_sessions` for your chosen date range.
-- **Q8 – Sessions that start a chapter but never complete one**: from `funnel_sessions`, compare `sessions_with_chapter_started` vs `sessions_with_chapter_completed` and compute the difference / `total_sessions`.
-- **Q9 – High deaths, low progression sessions**: query `fct_sessions` filtering for `deaths_count` above a threshold and `chapters_completed = 0` (or very low), optionally grouping by chapter or difficulty to locate problem areas.
+Aggregate funnel counts first, then compute drop from the previous step.  
+Do not compare raw percentages across different denominators.
 
 </details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q6: Biggest drop between consecutive funnel steps.
+with totals as (
+    select
+        sum(total_sessions) as total_sessions,
+        sum(sessions_with_game_started) as game_started_sessions,
+        sum(sessions_with_chapter_started) as chapter_started_sessions,
+        sum(sessions_with_checkpoint_reached) as checkpoint_sessions,
+        sum(sessions_with_chapter_completed) as chapter_completed_sessions,
+        sum(sessions_with_game_closed) as game_closed_sessions
+    from funnel_sessions
+),
+steps as (
+    select 1 as step_order, 'total_sessions' as step_name, total_sessions as sessions_reached from totals
+    union all
+    select 2, 'game_started', game_started_sessions from totals
+    union all
+    select 3, 'chapter_started', chapter_started_sessions from totals
+    union all
+    select 4, 'checkpoint_reached', checkpoint_sessions from totals
+    union all
+    select 5, 'chapter_completed', chapter_completed_sessions from totals
+    union all
+    select 6, 'game_closed', game_closed_sessions from totals
+),
+step_metrics as (
+    select
+        step_order,
+        step_name,
+        sessions_reached,
+        lag(sessions_reached) over (order by step_order) as prev_sessions
+    from steps
+)
+select
+    step_name,
+    sessions_reached,
+    round((1 - sessions_reached::float / nullif(prev_sessions, 0)) * 100, 2) as drop_from_previous_step_pct
+from step_metrics
+where prev_sessions is not null
+qualify row_number() over (order by drop_from_previous_step_pct desc) = 1;
+```
+
+This returns the exact funnel stage with the worst step-to-step conversion loss.
+
+</details>
+
+7. What % of sessions never reach a **checkpoint**?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Use total sessions as denominator and checkpoint-reached sessions as numerator.  
+This is `1 - checkpoint reach rate`.
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q7: Sessions that never reach a checkpoint.
+select
+    round(
+        (1 - sum(sessions_with_checkpoint_reached)::float / nullif(sum(total_sessions), 0)) * 100,
+        2
+    ) as pct_sessions_without_checkpoint
+from funnel_sessions;
+```
+
+This is the cleanest top-level checkpoint friction KPI.
+
+</details>
+
+8. What % of sessions start a chapter but never complete one?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Use sessions with chapter start as denominator; measure how many of those fail to complete any chapter.
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q8: Among sessions that started a chapter, percent that completed none.
+with totals as (
+    select
+        sum(sessions_with_chapter_started) as started_sessions,
+        sum(sessions_with_chapter_completed) as completed_sessions
+    from funnel_sessions
+)
+select
+    round(
+        greatest(started_sessions - completed_sessions, 0) * 100.0 / nullif(started_sessions, 0),
+        2
+    ) as pct_started_sessions_without_completion
+from totals;
+```
+
+This isolates failure after entry into chapter gameplay, which is where level design friction often appears.
+
+</details>
+
+9. Are there sessions with **high deaths but low progression**?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Define "high deaths" relative to each difficulty (p90 threshold) and "low progression" as zero chapter completions.  
+Difficulty-aware thresholds avoid false positives on naturally harder modes.
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q9: Sessions with high deaths (difficulty-specific p90) and zero chapter completion.
+with death_thresholds as (
+    select
+        difficulty_selected,
+        percentile_cont(0.9) within group (order by deaths_count) as p90_deaths
+    from fct_sessions
+    group by 1
+)
+select
+    s.session_id,
+    s.player_id,
+    s.difficulty_selected,
+    s.deaths_count,
+    s.chapters_completed,
+    s.session_duration_minutes,
+    s.events_per_minute
+from fct_sessions s
+inner join death_thresholds t
+    on s.difficulty_selected = t.difficulty_selected
+where s.deaths_count >= t.p90_deaths
+  and s.chapters_completed = 0
+order by s.deaths_count desc, s.session_duration_minutes desc;
+```
+
+The result is an actionable session list for difficulty tuning and encounter pacing review.
+
+</details>
+
+Goal: identify friction points in the core loop.
 
 ### 3. Difficulty & Balance
 
 10. Which difficulty has the highest **death rate per session**?
-11. Do players on higher difficulty churn faster?
-12. Which chapters have the lowest completion rates?
-13. Is there a relationship between **session duration** and **chapter completion**?
-
-Goal: detect balance issues before ship.
 
 <details>
-<summary>Check yourself — 3. Difficulty & Balance</summary>
+<summary>Check Answer in details</summary>
 
-- **Q10 – Difficulty with highest death rate per session**: from `fct_sessions`, group by `difficulty_selected` and compute `sum(deaths_count) / count(*)` (or average `deaths_count`).
-- **Q11 – Do higher difficulties churn faster?**: from `retention`, group by `difficulty_selected` and `days_since_cohort` (e.g. day 1 / 7) and compare `retention_rate_pct` across difficulties.
-- **Q12 – Chapters with lowest completion**: use `fct_game_events` (or staging events) to compare counts of `chapter_started` vs `chapter_completed` by `chapter_id` / `chapter_name` and compute completion rate.
-- **Q13 – Session duration vs chapter completion**: from `fct_sessions`, bucket `session_duration_minutes` (short/medium/long) and compute `chapters_completed` or completion rate per bucket to see the relationship.
+Compute deaths per session as `sum(deaths_count) / count(*)` by difficulty.  
+This keeps the metric aligned with session-level gameplay experience.
 
 </details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q10: Difficulty with the highest deaths per session.
+select
+    difficulty_selected,
+    count(*) as sessions,
+    sum(deaths_count) as total_deaths,
+    round(sum(deaths_count)::float / nullif(count(*), 0), 2) as deaths_per_session
+from fct_sessions
+group by 1
+order by deaths_per_session desc;
+```
+
+Top row is the difficulty with the highest death burden per play session.
+
+</details>
+
+11. Do players on higher difficulty churn faster?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Compare weighted D1 and D7 retention by difficulty and derive churn as `100 - retention`.  
+Use mature cohorts and zero-fill to avoid survivorship bias.
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q11: Churn pace by difficulty from D1 and D7 retention.
+with cohort_base as (
+    select
+        cohort_date,
+        country_code,
+        difficulty_selected,
+        max(cohort_size) as cohort_size
+    from retention
+    where days_since_cohort = 0
+    group by 1, 2, 3
+),
+target_days as (
+    select column1::int as days_since_cohort
+    from values (1), (7)
+),
+cohort_day_grid as (
+    select
+        c.cohort_date,
+        c.country_code,
+        c.difficulty_selected,
+        d.days_since_cohort,
+        c.cohort_size
+    from cohort_base c
+    cross join target_days d
+    where c.cohort_date <= dateadd(day, -d.days_since_cohort, current_date)
+),
+retention_filled as (
+    select
+        g.difficulty_selected,
+        g.days_since_cohort,
+        coalesce(r.active_players, 0) as active_players,
+        g.cohort_size
+    from cohort_day_grid g
+    left join retention r
+        on r.cohort_date = g.cohort_date
+        and r.country_code = g.country_code
+        and r.difficulty_selected = g.difficulty_selected
+        and r.days_since_cohort = g.days_since_cohort
+)
+select
+    difficulty_selected,
+    days_since_cohort as retention_day,
+    round(sum(active_players) * 100.0 / nullif(sum(cohort_size), 0), 2) as retention_rate_pct,
+    round(100 - (sum(active_players) * 100.0 / nullif(sum(cohort_size), 0)), 2) as churn_rate_pct
+from retention_filled
+group by 1, 2
+order by retention_day, difficulty_selected;
+```
+
+If harder difficulties show systematically lower D1/D7 retention and higher churn, they churn faster.
+
+</details>
+
+12. Which chapters have the lowest completion rates?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Use chapter-level event properties from `fct_game_events.properties` to compare `chapter_started` vs `chapter_completed`.  
+Apply a minimum starts threshold to avoid noisy chapters.
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q12: Chapter completion rate from chapter_started vs chapter_completed.
+with chapter_events as (
+    select
+        properties:chapter_id::int as chapter_id,
+        properties:chapter_name::string as chapter_name,
+        event_name
+    from fct_game_events
+    where event_name in ('chapter_started', 'chapter_completed')
+),
+chapter_totals as (
+    select
+        chapter_id,
+        chapter_name,
+        count_if(event_name = 'chapter_started') as starts,
+        count_if(event_name = 'chapter_completed') as completions
+    from chapter_events
+    where chapter_id is not null
+    group by 1, 2
+)
+select
+    chapter_id,
+    chapter_name,
+    starts,
+    completions,
+    round(completions * 100.0 / nullif(starts, 0), 2) as completion_rate_pct
+from chapter_totals
+where starts >= 30
+order by completion_rate_pct asc, starts desc;
+```
+
+Lowest completion-rate chapters are likely balance or pacing problem areas.
+
+</details>
+
+13. Is there a relationship between **session duration** and **chapter completion**?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Bucket sessions by duration and compare chapter completion metrics per bucket.  
+Both "% with any completion" and average completions per session are useful.
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q13: Session duration bucket vs chapter completion outcomes.
+with session_buckets as (
+    select
+        case
+            when session_duration_minutes < 20 then 'short (<20m)'
+            when session_duration_minutes < 45 then 'medium (20-44m)'
+            else 'long (45m+)'
+        end as duration_bucket,
+        case when chapters_completed > 0 then 1 else 0 end as has_any_chapter_completion,
+        chapters_completed
+    from fct_sessions
+)
+select
+    duration_bucket,
+    count(*) as sessions,
+    round(avg(has_any_chapter_completion) * 100, 2) as pct_sessions_with_any_completion,
+    round(avg(chapters_completed), 2) as avg_chapters_completed_per_session
+from session_buckets
+group by 1
+order by
+    case duration_bucket
+        when 'short (<20m)' then 1
+        when 'medium (20-44m)' then 2
+        else 3
+    end;
+```
+
+If longer buckets show higher completion metrics, longer sessions correlate with progression.
+
+</details>
+
+Goal: detect balance issues before ship.
 
 ### 4. Session Behavior
 
 14. What is the **median session duration**?
-15. Are longer sessions correlated with higher retention?
-16. What is the average **events_per_minute**?
-17. Are there sessions with zero or unusually low event activity?
-
-Goal: understand how players actually play.
 
 <details>
-<summary>Check yourself — 4. Session Behavior</summary>
+<summary>Check Answer in details</summary>
 
-- **Q14 – Median session duration**: read `median(session_duration_minutes)` (or approximate with `percentile_cont(0.5)`) from `fct_sessions`.
-- **Q15 – Longer sessions vs retention**: aggregate `fct_sessions` to player level (e.g. average `session_duration_minutes` per player), join to `retention` or cohort info, and compare retention metrics across duration buckets.
-- **Q16 – Average events_per_minute**: from `fct_sessions`, take `avg(events_per_minute)` (optionally by difficulty, platform, or country).
-- **Q17 – Low-activity sessions**: filter `fct_sessions` where `events_per_minute` is near zero or `total_events = 0` to find idle/buggy sessions.
+Use percentile, not average. Median is robust to long-session outliers.
 
 </details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q14: Median session duration.
+select
+    round(percentile_cont(0.5) within group (order by session_duration_minutes), 2)
+        as median_session_duration_minutes
+from fct_sessions;
+```
+
+This is the central tendency of playtime per session.
+
+</details>
+
+15. Are longer sessions correlated with higher retention?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Build a per-player D7 return flag and compare D7 retention across player-duration quartiles.  
+Quartiles avoid arbitrary bucket cutoffs and reveal monotonic trends.
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q15: Correlation check between average player session duration and D7 retention.
+with session_dates as (
+    select
+        player_id,
+        date(session_start_at) as session_date,
+        session_duration_minutes
+    from fct_sessions
+),
+player_base as (
+    select
+        player_id,
+        min(session_date) as cohort_date,
+        avg(session_duration_minutes) as avg_session_duration_minutes
+    from session_dates
+    group by 1
+),
+d7_flags as (
+    select
+        p.player_id,
+        p.avg_session_duration_minutes,
+        case when d7.player_id is not null then 1 else 0 end as returned_d7
+    from player_base p
+    left join (
+        select distinct player_id, session_date
+        from session_dates
+    ) d7
+        on d7.player_id = p.player_id
+        and d7.session_date = dateadd(day, 7, p.cohort_date)
+    where p.cohort_date <= dateadd(day, -7, current_date)
+),
+ranked as (
+    select
+        player_id,
+        avg_session_duration_minutes,
+        returned_d7,
+        ntile(4) over (order by avg_session_duration_minutes) as duration_quartile
+    from d7_flags
+)
+select
+    duration_quartile,
+    count(*) as players,
+    round(avg(avg_session_duration_minutes), 2) as avg_duration_minutes,
+    round(avg(returned_d7) * 100, 2) as d7_retention_rate_pct
+from ranked
+group by 1
+order by 1;
+```
+
+If D7 retention rises with quartile number, longer sessions are positively correlated with retention.
+
+</details>
+
+16. What is the average **events_per_minute**?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Use `fct_sessions.events_per_minute` directly and report overall average (optionally segmented).
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q16: Overall average event intensity.
+select
+    round(avg(events_per_minute), 2) as avg_events_per_minute
+from fct_sessions;
+```
+
+This is the baseline interaction intensity for the session population.
+
+</details>
+
+17. Are there sessions with zero or unusually low event activity?
+
+<details>
+<summary>Check Answer in details</summary>
+
+Use two flags:
+1. hard zero (`total_events = 0`)
+2. very low activity (bottom 5% `events_per_minute`).
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q17: Zero-event and very-low-activity session shares.
+with thresholds as (
+    select percentile_cont(0.05) within group (order by events_per_minute) as p05_events_per_minute
+    from fct_sessions
+),
+flagged as (
+    select
+        case
+            when total_events = 0 then 'zero_events'
+            when events_per_minute <= (select p05_events_per_minute from thresholds) then 'very_low_events_per_minute'
+            else null
+        end as issue_type
+    from fct_sessions
+)
+select
+    issue_type,
+    count(*) as sessions,
+    round(count(*) * 100.0 / nullif((select count(*) from fct_sessions), 0), 2) as pct_of_sessions
+from flagged
+where issue_type is not null
+group by 1
+order by sessions desc;
+```
+
+This separates true no-activity sessions from low-intensity but nonzero sessions.
+
+</details>
+
+Goal: understand how players actually play.
 
 ### 5. Segmentation
 
@@ -351,20 +1106,105 @@ Goal: understand how players actually play.
 - From which countries?
 - On which difficulty?
 
+<details>
+<summary>Check Answer in details</summary>
+
+`dim_players` gives session/playtime thresholds.  
+Use `fct_sessions` to compute chapter completion count per player, then segment core users by country and difficulty.
+
+</details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q18: Core players and their country/difficulty distribution.
+with player_progress as (
+    select
+        player_id,
+        sum(chapters_completed) as chapters_completed_total
+    from fct_sessions
+    group by 1
+),
+core_players as (
+    select
+        p.player_id,
+        p.country_code,
+        p.difficulty_selected
+    from dim_players p
+    left join player_progress pr
+        on p.player_id = pr.player_id
+    where p.total_sessions >= 5
+      and p.total_playtime_minutes >= 120
+      and coalesce(pr.chapters_completed_total, 0) >= 1
+)
+select
+    country_code,
+    difficulty_selected,
+    count(*) as core_players,
+    sum(count(*)) over () as total_core_players
+from core_players
+group by 1, 2
+order by core_players desc;
+```
+
+`total_core_players` answers "how many"; grouped rows answer where they come from and what they play.
+
+</details>
+
 19. Define "one-and-done" players (1 session, no chapter completed).
 
 - What % of total players are they?
 - Do they cluster by country or difficulty?
 
-Goal: separate your engaged audience from early churn.
-
 <details>
-<summary>Check yourself — 5. Segmentation</summary>
+<summary>Check Answer in details</summary>
 
-- **Q18 – Core players**: in `dim_players`, define a core player as `total_sessions >= 5`, `total_playtime_minutes >= 120`, and `chapters_completed >= 1` (if you add that metric); count them and slice by `country_code` and `difficulty_selected`.
-- **Q19 – One-and-done players**: from `dim_players`, filter `total_sessions = 1` and (optionally) zero progression; compute their share of all players and break down by country and difficulty to see where early churn concentrates.
+Join `dim_players` with per-player chapter completion totals from `fct_sessions`, then compare one-and-done volume against all players.
 
 </details>
+
+<details>
+<summary>SQL code with explanation</summary>
+
+```sql
+-- Q19: One-and-done share and clustering by country/difficulty.
+with player_progress as (
+    select
+        player_id,
+        sum(chapters_completed) as chapters_completed_total
+    from fct_sessions
+    group by 1
+),
+one_and_done as (
+    select
+        p.player_id,
+        p.country_code,
+        p.difficulty_selected
+    from dim_players p
+    left join player_progress pr
+        on p.player_id = pr.player_id
+    where p.total_sessions = 1
+      and coalesce(pr.chapters_completed_total, 0) = 0
+),
+totals as (
+    select count(*) as total_players from dim_players
+)
+select
+    country_code,
+    difficulty_selected,
+    count(*) as one_and_done_players,
+    round(count(*) * 100.0 / nullif((select total_players from totals), 0), 2) as pct_of_all_players
+from one_and_done
+group by 1, 2
+order by one_and_done_players desc;
+```
+
+Summing `one_and_done_players` gives the absolute count; `pct_of_all_players` gives population share.
+
+</details>
+
+Goal: separate your engaged audience from early churn.
 
 ### Completion Criteria
 
