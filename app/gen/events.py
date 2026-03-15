@@ -21,7 +21,8 @@ OUTPUT_CSV = OUTPUT_DIR / "raw_game_events.csv"
 GAME_VERSION = os.getenv("GAME_VERSION", "1.0.3")
 EVENT_DATE_START = os.getenv("EVENT_DATE_START")  # YYYY-MM-DD, optional
 EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
-LOAD_BATCH_ID = int(os.getenv("LOAD_BATCH_ID", "1"))  # For incremental: batch 2+ = new events, unique IDs
+# Incremental: EVENT_ID_OFFSET = max existing + 1 (e.g. 50001 if max is event_50000)
+EVENT_ID_OFFSET = os.getenv("EVENT_ID_OFFSET")
 
 EVENT_TYPES = [
     "game_started",
@@ -84,6 +85,7 @@ def random_time(start: datetime, end: datetime) -> datetime:
 
 # Deterministic event ID counter (reset each run so same seed => same IDs)
 _event_id_counter = [0]
+_event_id_offset = int(EVENT_ID_OFFSET) if EVENT_ID_OFFSET else 0
 
 
 def make_event(
@@ -94,7 +96,8 @@ def make_event(
     properties: Dict,
 ) -> Dict:
     """Make an event json object (event_id is deterministic for reproducible runs)."""
-    eid = f"event_{_event_id_counter[0]}" if LOAD_BATCH_ID == 1 else f"event_{LOAD_BATCH_ID}_{_event_id_counter[0]}"
+    n = _event_id_counter[0]
+    eid = f"event_{_event_id_offset + n}" if _event_id_offset else f"event_{n}"
     _event_id_counter[0] += 1
     return {
         "event_id": eid,
@@ -336,7 +339,7 @@ def generate_events_for_session(session, difficulty) -> List[Dict]:
 def main():
     seed = int(os.getenv("GAME_DATA_SEED", "42"))
     random.seed(seed)
-    _event_id_counter[0] = 0
+    _event_id_counter[0] = 0  # offset is applied in make_event()
 
     # Read input CSV files
     players = pd.read_csv(PLAYERS_CSV)

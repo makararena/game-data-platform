@@ -19,7 +19,8 @@ OUTPUT_CSV = OUTPUT_DIR / "raw_sessions.csv"
 MAX_SESSIONS_PER_PLAYER = int(os.getenv("MAX_SESSIONS_PER_PLAYER", "25"))
 EVENT_DATE_START = os.getenv("EVENT_DATE_START")  # YYYY-MM-DD, optional
 EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
-LOAD_BATCH_ID = int(os.getenv("LOAD_BATCH_ID", "1"))  # For incremental: batch 2+ = new sessions, unique IDs
+# Incremental: SESSION_ID_OFFSET = max existing + 1 (e.g. 6001 if max is session_6000)
+SESSION_ID_OFFSET = os.getenv("SESSION_ID_OFFSET")
 
 PLATFORMS = [
     ("ps3", 0.50),
@@ -76,6 +77,7 @@ def _parse_event_range():
 def generate_sessions(players_df: pd.DataFrame) -> pd.DataFrame:
     range_start, range_end = _parse_event_range()
     sessions = []
+    offset = int(SESSION_ID_OFFSET) if SESSION_ID_OFFSET else 0
     session_counter = 1
 
     for _, player in players_df.iterrows():
@@ -108,7 +110,7 @@ def generate_sessions(players_df: pd.DataFrame) -> pd.DataFrame:
                 continue
 
             platform = weighted_choice(PLATFORMS)
-            session_id = f"session_{session_counter}" if LOAD_BATCH_ID == 1 else f"session_{LOAD_BATCH_ID}_{session_counter}"
+            session_id = f"session_{offset + session_counter - 1}" if offset else f"session_{session_counter}"
             sessions.append(
                 {
                     "session_id": session_id,

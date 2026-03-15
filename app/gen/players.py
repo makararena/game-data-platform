@@ -16,7 +16,8 @@ OUTPUT_CSV = OUTPUT_DIR / "raw_players.csv"
 N_PLAYERS = int(os.getenv("N_PLAYERS", "1500"))
 EVENT_DATE_START = os.getenv("EVENT_DATE_START")  # YYYY-MM-DD, optional
 EVENT_DATE_END = os.getenv("EVENT_DATE_END")  # YYYY-MM-DD, optional
-LOAD_BATCH_ID = int(os.getenv("LOAD_BATCH_ID", "1"))  # For incremental: batch 2+ = new users, unique IDs
+# Incremental: PLAYER_ID_OFFSET = max existing + 1 (e.g. 890 if max is player_889)
+PLAYER_ID_OFFSET = os.getenv("PLAYER_ID_OFFSET")
 
 # Countries and languages
 COUNTRIES = [
@@ -88,8 +89,11 @@ def generate_players(n_players: int) -> pd.DataFrame:
 
     for i in range(1, n_players + 1):
         country, language = random.choice(COUNTRIES)
-        # Batch 1: legacy format (player_1, player_2). Batch 2+: namespaced (player_2_1, player_2_2)
-        player_id = f"player_{i}" if LOAD_BATCH_ID == 1 else f"player_{LOAD_BATCH_ID}_{i}"
+        # Full load: player_1, player_2, ... Incremental: player_{offset}, player_{offset+1}, ...
+        if PLAYER_ID_OFFSET:
+            player_id = f"player_{int(PLAYER_ID_OFFSET) + i - 1}"
+        else:
+            player_id = f"player_{i}"
         player = {
             "player_id": player_id,
             "first_seen_at": random_timestamp_in_event_range(),

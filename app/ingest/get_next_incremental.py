@@ -1,12 +1,16 @@
 """
 Compute next incremental batch params from Snowflake RAW tables.
 
-Queries max date and max batch from existing data, returns:
-  - BATCH_NUM: next batch (max + 1)
+Queries max date and max numeric IDs from existing data, returns:
   - START_DATE: day after max session/event date
   - END_DATE: start + 31 days
+  - PLAYER_ID_OFFSET: max(player_id number) + 1 (e.g. max player_889 → 890)
+  - SESSION_ID_OFFSET: max(session_id number) + 1
+  - EVENT_ID_OFFSET: max(event_id number) + 1
 
-If tables are empty or missing, uses defaults: batch 2, 2011-02-13..2011-03-15.
+Uses sequential IDs (player_890, player_891, ...) instead of batch-prefixed (player_2_1).
+
+If tables are empty or missing, uses defaults: 2011-02-13..2011-03-15, offsets 1/1/0.
 
 Output: KEY=value lines for shell eval.
 """
@@ -29,12 +33,26 @@ SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA", "RAW")
 
 DEFAULT_START = "2011-02-13"
 DEFAULT_END = "2011-03-15"
-DEFAULT_BATCH = 2
 INCREMENT_DAYS = 31
 
 
+def _query_max_numeric_id(cursor, table: str, id_col: str) -> int:
+    """Extract max numeric part from IDs like player_889, player_2_1, session_1234."""
+    try:
+        cursor.execute(
+            f"""
+            SELECT MAX(TRY_CAST(REGEXP_SUBSTR({id_col}, '[0-9]+', 1, 1) AS INT))
+            FROM {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{table}
+            """
+        )
+        row = cursor.fetchone()
+        return int(row[0]) if row and row[0] is not None else 0
+    except Exception:
+        return 0
+
+
 def get_next_incremental_params():
-    """Query Snowflake for max date and batch; return next params."""
+    """Query Snowflake for max date and max IDs; return next params."""
     conn = None
     try:
         conn = get_snowflake_connection()
@@ -63,25 +81,10 @@ def get_next_incremental_params():
             except Exception:
                 pass
 
-        # Max batch from RAW_PLAYERS: player_1 (batch 1) vs player_2_1 (batch 2)
-        max_batch = 1
-        try:
-            cursor.execute(
-                f"""
-                SELECT MAX(
-                    CASE WHEN SPLIT_PART(PLAYER_ID, '_', 3) != ''
-                        THEN TRY_CAST(SPLIT_PART(PLAYER_ID, '_', 2) AS INT)
-                        ELSE 1
-                    END
-                )
-                FROM {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.RAW_PLAYERS
-                """
-            )
-            row = cursor.fetchone()
-            if row and row[0] is not None:
-                max_batch = int(row[0])
-        except Exception:
-            pass
+        # Max numeric IDs for sequential generation (player_889 → next is player_890)
+        max_player = _query_max_numeric_id(cursor, "RAW_PLAYERS", "PLAYER_ID")
+        max_session = _query_max_numeric_id(cursor, "RAW_SESSIONS", "SESSION_ID")
+        max_event = _query_max_numeric_id(cursor, "RAW_GAME_EVENTS", "EVENT_ID")
 
         cursor.close()
 
@@ -90,27 +93,31 @@ def get_next_incremental_params():
             end_d = start_d + timedelta(days=INCREMENT_DAYS)
             start_str = start_d.strftime("%Y-%m-%d")
             end_str = end_d.strftime("%Y-%m-%d")
-            batch = max_batch + 1
         else:
             start_str = DEFAULT_START
             end_str = DEFAULT_END
-            batch = DEFAULT_BATCH
 
-        return batch, start_str, end_str
+        player_offset = max_player + 1
+        session_offset = max_session + 1
+        event_offset = max_event + 1
+
+        return start_str, end_str, player_offset, session_offset, event_offset
 
     except Exception as e:
         print(f"# Warning: {e}", file=sys.stderr)
-        return DEFAULT_BATCH, DEFAULT_START, DEFAULT_END
+        return DEFAULT_START, DEFAULT_END, 1, 1, 0
     finally:
         if conn:
             conn.close()
 
 
 def main():
-    batch, start, end = get_next_incremental_params()
-    print(f"INC_BATCH={batch}")
+    start, end, player_offset, session_offset, event_offset = get_next_incremental_params()
     print(f"INC_START={start}")
     print(f"INC_END={end}")
+    print(f"INC_PLAYER_OFFSET={player_offset}")
+    print(f"INC_SESSION_OFFSET={session_offset}")
+    print(f"INC_EVENT_OFFSET={event_offset}")
 
 
 if __name__ == "__main__":

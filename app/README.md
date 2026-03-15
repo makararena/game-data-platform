@@ -65,7 +65,7 @@ Config (edit in `main.py` or pass via env):
 - `MAX_SESSIONS_PER_PLAYER` – max sessions per player (default: 25)
 - `GAME_VERSION` – version string for events (default: `1.0.3`)
 - `GAME_DATA_SEED` – random seed (default: `42`). Same seed ensures **every run produces the same data** for all users, so everyone can compare dbt results on identical inputs.
-- `LOAD_BATCH_ID` – batch ID (default: 1). Use `--batch 2` or higher for incremental: **new users, sessions, events** with unique IDs.
+- `PLAYER_ID_OFFSET`, `SESSION_ID_OFFSET`, `EVENT_ID_OFFSET` – for incremental mode: start IDs from max existing + 1 (e.g. `player_890` if max is `player_889`).
 
 ### 2. Load into Snowflake
 
@@ -113,14 +113,15 @@ For incremental dbt testing, generate a **new batch** of users with unique IDs:
 python app/main.py
 
 # 2. Generate an incremental batch: new users, sessions, events
-#    Use --batch 2+ and a later date range; no overlap with previous data
+#    Export ID offsets from Snowflake (max + 1), then generate with --batch 2
+export PLAYER_ID_OFFSET=2001 SESSION_ID_OFFSET=6001 EVENT_ID_OFFSET=50001
 python app/main.py --batch 2 --start 2011-02-13 --end 2011-03-15 --no-ingest
 
 # 3. Append the new batch into Snowflake
 python app/ingest/load_to_snowflake.py --mode append
 ```
 
-For batch 2+, IDs are namespaced: `player_2_1`, `session_2_1`, `event_2_0`, etc., so no duplicates with batch 1.
+For incremental batches, IDs continue from the max in Snowflake: `player_890`, `player_891`, ... (if max was `player_889`).
 
 ### 4. Transform with dbt
 

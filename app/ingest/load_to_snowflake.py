@@ -85,6 +85,7 @@ SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
 SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
 SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
 SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
+SNOWFLAKE_ROLE = os.getenv("SNOWFLAKE_ROLE")
 
 # File paths
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -142,14 +143,17 @@ def get_snowflake_connection():
             "SNOWFLAKE_USER and SNOWFLAKE_PASSWORD environment variables must be set"
         )
     
-    conn = snowflake.connector.connect(
-        user=SNOWFLAKE_USER,
-        password=SNOWFLAKE_PASSWORD,
-        account=SNOWFLAKE_ACCOUNT,
-        warehouse=SNOWFLAKE_WAREHOUSE,
-        database=SNOWFLAKE_DATABASE,
-        schema=SNOWFLAKE_SCHEMA,
-    )
+    conn_params = {
+        "user": SNOWFLAKE_USER,
+        "password": SNOWFLAKE_PASSWORD,
+        "account": SNOWFLAKE_ACCOUNT,
+        "warehouse": SNOWFLAKE_WAREHOUSE,
+        "database": SNOWFLAKE_DATABASE,
+        "schema": SNOWFLAKE_SCHEMA,
+    }
+    if SNOWFLAKE_ROLE:
+        conn_params["role"] = SNOWFLAKE_ROLE
+    conn = snowflake.connector.connect(**conn_params)
     return conn
 
 

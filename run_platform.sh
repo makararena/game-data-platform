@@ -128,6 +128,7 @@ if [ -f "${ENV_FILE}" ] && \
   echo "  Warehouse: ${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}"
   echo "  Database:  ${SNOWFLAKE_DATABASE:-GAME_ANALYTICS}"
   echo "  Schema:    ${SNOWFLAKE_SCHEMA:-RAW}"
+  echo "  Role:      ${SNOWFLAKE_ROLE:-<default>}"
   read -r -p "Reuse these values and skip credential prompts? [Y/n]: " REUSE_EXISTING || true
   REUSE_EXISTING="${REUSE_EXISTING:-Y}"
   if [[ "$REUSE_EXISTING" =~ ^[Yy]$ ]]; then
@@ -155,6 +156,7 @@ if [ "${SKIP_CREDENTIAL_PROMPTS}" != "true" ]; then
   prompt_with_default "Snowflake warehouse" "${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}" SNOWFLAKE_WAREHOUSE
   prompt_with_default "Snowflake database" "${SNOWFLAKE_DATABASE:-GAME_ANALYTICS}" SNOWFLAKE_DATABASE
   prompt_with_default "Snowflake schema for RAW tables" "${SNOWFLAKE_SCHEMA:-RAW}" SNOWFLAKE_SCHEMA
+  prompt_with_default "Snowflake role (leave empty for default)" "${SNOWFLAKE_ROLE:-}" SNOWFLAKE_ROLE
 fi
 
 if [ -z "${SNOWFLAKE_ACCOUNT}" ] || [ -z "${SNOWFLAKE_USER}" ] || [ -z "${SNOWFLAKE_PASSWORD}" ]; then
@@ -173,6 +175,9 @@ print_step "Writing Snowflake credentials to app/.env"
   echo "SNOWFLAKE_WAREHOUSE=${SNOWFLAKE_WAREHOUSE}"
   echo "SNOWFLAKE_DATABASE=${SNOWFLAKE_DATABASE}"
   echo "SNOWFLAKE_SCHEMA=${SNOWFLAKE_SCHEMA}"
+  if [ -n "${SNOWFLAKE_ROLE:-}" ]; then
+    echo "SNOWFLAKE_ROLE=${SNOWFLAKE_ROLE}"
+  fi
 } > "${ENV_FILE}"
 
 print_ok "Saved Snowflake config to $(basename "${ENV_FILE}")"
@@ -210,20 +215,26 @@ RUN_MODE="${RUN_MODE:-1}"
 # ----- Generate data -------------------------------------------------------
 
 if [[ "$RUN_MODE" == "2" ]]; then
-  # Auto-detect next batch and date range from Snowflake (max date + 1, max batch + 1)
-  print_step "Incremental batch: detecting next batch and date range from Snowflake"
-  INC_BATCH=2
+  # Auto-detect next date range and ID offsets from Snowflake (max date + 1, max ID + 1)
+  print_step "Incremental batch: detecting date range and ID offsets from Snowflake"
   INC_START="2011-02-13"
   INC_END="2011-03-15"
+  INC_PLAYER_OFFSET=1
+  INC_SESSION_OFFSET=1
+  INC_EVENT_OFFSET=0
   if eval "$(cd "${APP_DIR}" && python ingest/get_next_incremental.py 2>/dev/null)"; then
     :
   fi
-  echo "  Batch ${INC_BATCH:-2}, dates ${INC_START:-2011-02-13}..${INC_END:-2011-03-15}"
+  echo "  Dates ${INC_START:-2011-02-13}..${INC_END:-2011-03-15}"
+  echo "  IDs from player_${INC_PLAYER_OFFSET:-1}, session_${INC_SESSION_OFFSET:-1}, event_${INC_EVENT_OFFSET:-0}"
   (
     cd "${APP_DIR}"
-    python main.py --batch "${INC_BATCH:-2}" --start "${INC_START:-2011-02-13}" --end "${INC_END:-2011-03-15}" --no-ingest
+    export PLAYER_ID_OFFSET="${INC_PLAYER_OFFSET:-1}"
+    export SESSION_ID_OFFSET="${INC_SESSION_OFFSET:-1}"
+    export EVENT_ID_OFFSET="${INC_EVENT_OFFSET:-0}"
+    python main.py --batch 2 --start "${INC_START:-2011-02-13}" --end "${INC_END:-2011-03-15}" --no-ingest
   )
-  print_ok "Incremental batch ${INC_BATCH:-2} generated (app/data/)"
+  print_ok "Incremental batch generated (app/data/)"
   print_step "Appending incremental batch into Snowflake RAW tables"
   (
     cd "${APP_DIR}"
